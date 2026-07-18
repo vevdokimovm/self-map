@@ -181,15 +181,15 @@
 ### 6.1. Где что лежит
 | Было (zip проекта) | Стало (репа) |
 |---|---|
-| `01_ПРАВИЛА.md` | `10-archive-analysis/00-protocol/01-rules.md` (этот файл) |
-| `02_WATCHLOG.md` | `10-archive-analysis/watchlog.md` (+ журнал репы `WATCHLOG.md` в корне) |
-| `04_ФАКТЫ_ГИПОТЕЗЫ.md` | `10-archive-analysis/01-registry/facts-and-hypotheses.md` |
-| `ЗАМЕТКИ/*` | `10-archive-analysis/02-notes/*` |
-| `ИСТОРИЯ/*` | `10-archive-analysis/09-history/*` |
+| `01_ПРАВИЛА.md` | `10-life-history/00-protocol/01-rules.md` (этот файл) |
+| `02_WATCHLOG.md` | `10-life-history/watchlog.md` (+ журнал репы `WATCHLOG.md` в корне) |
+| `04_ФАКТЫ_ГИПОТЕЗЫ.md` | `10-life-history/01-registry/facts-and-hypotheses.md` |
+| `ЗАМЕТКИ/*` | `10-life-history/02-notes/*` |
+| `ИСТОРИЯ/*` | `10-life-history/09-history/*` |
 | `ИСХОДНИКИ_НЕ_В_ПРОЕКТЕ/*` | `02-clinical/psychologist-sessions/*` (конвертированы в `.md`) |
 | `/mnt/project/Объединённый_дневник.csv` | `06-diaries/notion-reflections/datasets/diary-combined.csv` |
 
-Полная карта источников — `10-archive-analysis/01-registry/source-map.md`.
+Полная карта источников — `10-life-history/01-registry/source-map.md`.
 
 ### 6.2. Что изменилось в процедуре
 1. **Состояние не пересобирается в zip после каждого батча.** Вместо этого: правка файлов →

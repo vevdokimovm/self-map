@@ -64,6 +64,8 @@ publish.sh — автопуш версии (bump -> commit -> tag -> push -> Git
 Опции:
   --prerelease        пометить релиз как pre-release (или версия вида X.Y.Z-rcN)
   --asset PATH        приложить файл к GitHub Release (можно повторять)
+  --auto-asset        собрать zip-снапшот тега (git archive, с wrapper-папкой)
+                      и приложить его к Release автоматически
   --no-release        только тег+пуш, без создания GitHub Release
   --dry-run           показать, что будет сделано, НИЧЕГО не меняя
   --help              эта справка
@@ -74,7 +76,7 @@ USAGE
 }
 
 # ------------------------------------------------------------ ПАРСИНГ АРГ ----
-BUMP=""; SET_VERSION=""; PRERELEASE=0; NO_RELEASE=0; DRY=0
+BUMP=""; SET_VERSION=""; PRERELEASE=0; NO_RELEASE=0; DRY=0; AUTO_ASSET=0
 ASSETS=""   # список ассетов через перевод строки (zsh/bash-safe, без массивов)
 
 while [ "$#" -gt 0 ]; do
@@ -85,6 +87,7 @@ while [ "$#" -gt 0 ]; do
     --patch)   BUMP="patch"; shift ;;
     --prerelease) PRERELEASE=1; shift ;;
     --asset)   ASSETS="${ASSETS}${2:-}"$'\n'; shift 2 ;;
+    --auto-asset) AUTO_ASSET=1; shift ;;
     --no-release) NO_RELEASE=1; shift ;;
     --dry-run) DRY=1; shift ;;
     --help|-h) usage; exit 0 ;;
@@ -277,6 +280,29 @@ $(printf '%s' "$ASSETS")
 EOF
   gh "$@"
 }
+
+
+# --------------------------------------------------- АВТО-АССЕТ (--auto-asset) -
+# Снапшот дерева тега через git archive, с wrapper-директорией <repo>-vX_Y_Z/
+# (плоская упаковка однажды снесла репу — 10-git-reference.md). Идемпотентно.
+if [ "$AUTO_ASSET" -eq 1 ]; then
+  REPO_SLUG="$(basename "$(git rev-parse --show-toplevel)")"
+  VER_US="$(echo "$VERSION" | tr '.' '_')"
+  mkdir -p dist
+  AUTO_ZIP="dist/${REPO_SLUG}-v${VER_US}.zip"
+  if [ -f "$AUTO_ZIP" ]; then
+    info "авто-ассет уже собран: $AUTO_ZIP"
+  else
+    info "собираю авто-ассет: $AUTO_ZIP (git archive $TAG)"
+    if git archive --format=zip --prefix="${REPO_SLUG}-v${VER_US}/" -o "$AUTO_ZIP" "$TAG" 2>/dev/null; then
+      ok "авто-ассет собран: $AUTO_ZIP ($(du -h "$AUTO_ZIP" | cut -f1))"
+    else
+      c_ylw "⚠ git archive не удался — релиз выйдет без ассета (для knowledge-репы это норма)"
+      AUTO_ZIP=""
+    fi
+  fi
+  [ -n "$AUTO_ZIP" ] && ASSETS="${ASSETS}${AUTO_ZIP}"$'\n'
+fi
 
 if retry "gh release create" gh_create; then
   ok "GitHub Release $TAG создан (описание из $CHANGELOG_FILE)"
