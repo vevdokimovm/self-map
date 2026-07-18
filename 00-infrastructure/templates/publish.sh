@@ -179,7 +179,7 @@ pat = re.compile(r'^\s{0,3}##\s+\[?' + re.escape(version) + r'\]?')
 start = None
 for i, ln in enumerate(lines):
     if pat.match(ln):
-        start = i + 1
+        start = i          # включаем саму строку '## [X.Y.Z] — дата — название' (как в legal-knowledge-base)
         break
 if start is None:
     print(f"Release {version}")
@@ -268,7 +268,8 @@ rm -f "$GH_VIEW_OUT"
 
 # сборка команды создания релиза
 gh_create() {
-  set -- release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE"
+  REL_TITLE="$(basename "$(git rev-parse --show-toplevel)") v$VERSION"
+  set -- release create "$TAG" --title "$REL_TITLE" --notes-file "$NOTES_FILE"
   [ "$PRERELEASE" -eq 1 ] && set -- "$@" --prerelease
   # ассеты
   while IFS= read -r a; do
