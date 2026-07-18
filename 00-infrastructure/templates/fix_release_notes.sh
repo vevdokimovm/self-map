@@ -31,12 +31,20 @@ git rev-parse --git-dir >/dev/null 2>&1 || die "запускать внутри 
 [ -n "$PY" ] || die "python3 не найден"
 
 # --- список версий -----------------------------------------------------------
-VERSIONS="${*:-}"
-if [ -z "$VERSIONS" ] || [ "${1:-}" = "--all" ]; then
-  VERSIONS="$(git tag --list 'v[0-9]*' | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tr '\n' ' ')"
-  ylw "→ режим --all: версии из тегов: $VERSIONS"
+# ВАЖНО: список идёт через ФАЙЛ и читается while-read.
+# В zsh нет word splitting для unquoted переменных (в отличие от bash), поэтому
+# `for V in $VERSIONS` отдавал ОДИН элемент "1.0.0 1.1.0 1.2.0 1.3.0" — и всё пропускалось.
+# Редирект из файла (а не пайп) сохраняет счётчики: пайп создал бы subshell.
+VLIST="$(mktemp -t fixver.XXXXXX)"
+trap 'rm -f "$VLIST"' EXIT
+
+if [ "$#" -eq 0 ] || [ "${1:-}" = "--all" ]; then
+  git tag --list 'v[0-9]*' | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n > "$VLIST"
+  ylw "→ режим --all: версии из тегов: $(tr '\n' ' ' < "$VLIST")"
+else
+  printf '%s\n' "$@" > "$VLIST"
 fi
-[ -n "$VERSIONS" ] || die "нечего править: не переданы версии и нет тегов vX.Y.Z"
+[ -s "$VLIST" ] || die "нечего править: не переданы версии и нет тегов vX.Y.Z"
 
 extract_notes() {  # $1 = версия, печатает секцию в stdout
   "$PY" - "$CHANGELOG_FILE" "$1" <<'PYEOF'
@@ -68,7 +76,8 @@ PYEOF
 }
 
 FIXED=0; SKIPPED=0
-for V in $VERSIONS; do
+while IFS= read -r V; do
+  [ -n "$V" ] || continue
   TAG="v$V"
   if ! gh release view "$TAG" >/dev/null 2>&1; then
     ylw "  $TAG — релиза нет, пропускаю"; SKIPPED=$((SKIPPED+1)); continue
@@ -85,7 +94,7 @@ for V in $VERSIONS; do
     red "  ✗ $TAG — gh release edit не удался (проверь права токена)"
   fi
   rm -f "$NOTES"
-done
+done < "$VLIST"
 
 echo ""
 grn "ГОТОВО: исправлено $FIXED, пропущено $SKIPPED"
