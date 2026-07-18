@@ -186,7 +186,7 @@ if start is None:
     sys.exit(0)
 # до следующего '## ' — конец секции
 end = len(lines)
-for j in range(start, len(lines)):
+for j in range(start + 1, len(lines)):
     if re.match(r'^\s{0,3}##\s+', lines[j]):
         end = j
         break
@@ -268,8 +268,7 @@ rm -f "$GH_VIEW_OUT"
 
 # сборка команды создания релиза
 gh_create() {
-  REL_TITLE="$(basename "$(git rev-parse --show-toplevel)") v$VERSION"
-  set -- release create "$TAG" --title "$REL_TITLE" --notes-file "$NOTES_FILE"
+  set -- release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE"
   [ "$PRERELEASE" -eq 1 ] && set -- "$@" --prerelease
   # ассеты
   while IFS= read -r a; do
