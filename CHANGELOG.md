@@ -9,6 +9,13 @@
 
 ---
 
+## [1.10.1] — 2026-07-22 — усилен промпт вахты кита
+
+### Changed
+- `_knowledge-kit/ПРОМПТ_вахты.md` — первым действием сделано **обязательное чтение протокола из
+  project knowledge** (`protocol/01-rules.md`, `02-process.md`, `notes/handwritten-diary.md` §0,
+  `registry/facts-and-hypotheses.md`) до чтения любых страниц дневника. Раньше требование было мягче.
+
 ## [1.10.0] — 2026-07-22 — knowledge-кит: тонкий срез «мозга» для Project knowledge
 
 ### Added
