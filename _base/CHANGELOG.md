@@ -1,5 +1,61 @@
 # CHANGELOG — история инфраструктуры
 
+## [1.37.0] — 2026-08-12 — Служебные файлы подняты из реп (MINOR)
+
+Собрано скриптом `collect_to_base.py`: 51 файл(ов), которые независимо появились в нескольких репах и потому описывают общесистемные правила.
+
+- `00-navigator.md`
+- `08-automation-triggers.md`
+- `33-token-budget-and-modes.md`
+- `adr-template.md`
+- `agents.md`
+- `analiz-chatov-j.md`
+- `analiz-chatov-m.md`
+- `analiz-chatov-obshchiy.md`
+- `analiz-chatov-s.md`
+- `analiz-chatov-v.md`
+- `architecture.md`
+- `base-repo-readme.md`
+- `brand-voice.md`
+- `bug-report-template.md`
+- `changelog-template.md`
+- `changelog.md`
+- `claude.md`
+- `code-review.md`
+- `context.md`
+- `documentation-methodology.md`
+- `eksport-pamyati-dlya-drugoy-ii.md`
+- `frontend-design.md`
+- `incident-postmortem-guide.md`
+- `interview-prep.md`
+- `investigation-report-guide.md`
+- `kak-polzovatsya-instruktsiyami.md`
+- `kontekst-preferences-edition.md`
+- `kontekst-vasiliy-edinyy.md`
+- `lichnoe-analiz-vneshnosti.md`
+- `memory.md`
+- `merge-and-fork-guide.md`
+- `merge-manifest-v1-3-0.md`
+- `migratsiya-2letniy-plan.md`
+- `my-character-aktualno-na-07-07-26.md`
+- `pamyat-dlya-vsekh-akkauntov.md`
+- `psychology.md`
+- `put-s-iisusom-khristom.md`
+- `python-backend.md`
+- `release-report-template.md`
+- `repo-readme-template.md`
+- `report-types.md`
+- `repos-map.md`
+- `sborka-vse.md`
+- `sborka-yadro-profil.md`
+- `security-audit-template.md`
+- `skills.md`
+- `standarty-kod-i-karera.md`
+- `test-report-template.md`
+- `tone-of-voice.md`
+- `ucheba-obrazovanie.md`
+- `zdorove-klinicheskiy-portret.md`
+
 ## [1.36.0] — 2026-07-30 — Закрытие работ по деплойеру: синхронизация доков и прогон на боевой машине (MINOR)
 
 Итерации по скрипту закрыты. Приведены в соответствие цифры покрытия, дописаны описания
