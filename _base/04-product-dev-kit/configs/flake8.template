@@ -1,0 +1,9 @@
+[flake8]
+max-line-length = 88
+exclude = .git,__pycache__,.venv,venv,build,dist,migrations,alembic
+extend-ignore = E203, W503
+max-complexity = 12
+
+# 88 — согласовано с ../../00-infrastructure/python-backend.md (единый источник стиля кода
+# для новых проектов). FINPILOT исторически использует 100 — если наследуешь его конкретную
+# кодовую базу, а не начинаешь с нуля, зафиксируй выбор отдельным ADR, не молчаливым дефолтом.

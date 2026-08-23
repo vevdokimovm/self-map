@@ -1,0 +1,27 @@
+# Скопировать в .pre-commit-config.yaml, затем: pre-commit install
+# Проверить актуальность версий хуков (`rev:`) перед первым коммитом — здесь плейсхолдеры.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        args: ["--config=.flake8"]
+
+  # Точечный автофикс, НЕ полный `black .` по всему репо — см. STANDARD.md §2
+  # (массовое переформатирование ломает параллельный мёрж между сессиями/аккаунтами).
+  - repo: https://github.com/hhatto/autopep8
+    rev: v2.3.1
+    hooks:
+      - id: autopep8
+        args: ["--in-place", "--select=E1,E2,E3,W1,W2,W3"]

@@ -757,7 +757,11 @@ assert_contains "полный комплект → можно удалять" "$
 assert_contains "файл списка создан" "$(cat "$HOME/Downloads/safe_to_delete.txt" 2>/dev/null)" "vfy-repo-v1.0.0.zip"
 # путь обязан быть без отступа, иначе xargs rm сломается
 assert_missing "путь без ведущих пробелов" "$(head -1 "$HOME/Downloads/safe_to_delete.txt")" " /"
-xargs -d '\n' ls -1 -- < "$HOME/Downloads/safe_to_delete.txt" >/dev/null 2>&1 \
+# `xargs -d` — GNU-расширение, в BSD-xargs (macOS, где скрипт и запускают) его нет:
+# проверка падала не из-за деплойера, а из-за самой себя. Переносимо — через NUL-разделитель,
+# он есть в обоих. Тот же класс различия, что BSD/GNU sed, из-за которого набор ловил
+# ложные провалы и раньше.
+tr '\n' '\0' < "$HOME/Downloads/safe_to_delete.txt" | xargs -0 ls -1 -- >/dev/null 2>&1 \
   && ok "xargs находит файлы по списку" || bad "xargs находит файлы по списку"
 assert_missing "VERIFY ничего не публикует" "$OUT" "коммит:"
 # ломаем комплект: сносим ассет → архив держать
@@ -837,6 +841,26 @@ D="$SANDBOX/tI4"; mkdir -p "$D"
 make_zip "$D" "color-repo" "1.0.0" dot
 OUT="$(NO_COLOR= run_deploy "$D" 2>&1)"
 printf '%s' "$OUT" | grep -q "$(printf '\033')\[2m" && bad "в выводе нет dim" || ok "в выводе нет dim"
+
+case_ "I5" "Переменная вплотную к многобайтной пунктуации — под set -u это смерть прогона"
+# Механизм: «$var» — шелл при разборе имени может приклеить первый байт закрывающей
+# кавычки (0xC2 у «»), получить несуществующее имя и под `set -u` УБИТЬ прогон. Причём
+# в самой диагностической строке: скрипт падает вместо того, чтобы назвать проблему,
+# и один плохой архив роняет весь батч вместо пропуска одной версии.
+# Реально случилось на кейсе C12 (`.repo-id` с кириллицей): «$_ridrepo» и «$_aid».
+# Лечится фигурными скобками — ${var}. Проверка статическая: класс, а не два случая.
+BAREVAR="$(grep -nE '\$[A-Za-z_][A-Za-z0-9_]*[«»„“”‘’]' "$DEPLOY" | tr '\n' ' ')"
+assert_eq "нет голых \$var вплотную к «»" "$(printf '%s' "$BAREVAR" | tr -d ' ')" ""
+# И живая проверка того же: архив с .repo-id на кириллицу обязан дать ДИАГНОЗ, не падение
+D="$SANDBOX/tI5"; mkdir -p "$D"
+make_zip "$D" "cyr-repo" "1.0.0" dot
+tmp="$(mktemp -d)"; ( cd "$tmp" && unzip -qo "$D/cyr-repo-v1.0.0.zip" )
+printf 'testuser/КИРИЛЛИЦА\n' > "$tmp/cyr-repo-v1.0.0/.repo-id"
+rm "$D/cyr-repo-v1.0.0.zip"; ( cd "$tmp" && zip -qr "$D/cyr-repo-v1.0.0.zip" . ); rm -rf "$tmp"
+OUT="$(KEEP_ARCHIVES=1 run_deploy "$D" || true)"
+assert_contains "назван .repo-id" "$OUT" ".repo-id"
+assert_missing "прогон не умер по unbound variable" "$OUT" "unbound variable"
+[ ! -d "$REMOTES/cyr-repo.git" ] && ok "репа не создана" || bad "репа не создана"
 
 case_ "A7" "Дефолтный прогон сам убирает опубликованные архивы"
 D="$SANDBOX/tA7"; mkdir -p "$D"
@@ -975,6 +999,10 @@ rm "$D2/hold-repo-v1.0.0.zip"; ( cd "$tmp" && zip -qr "$D2/hold-repo-v1.0.0.zip"
 OUT="$(KEEP_ARCHIVES=0 run_deploy "$D2")"
 [ -f "$D2/hold-repo-v1.0.0.zip" ] && ok "без релиза архив оставлен" || bad "без релиза архив оставлен"
 assert_contains "причина названа" "$OUT" "не хватает"
+# 4.17.0: диагноз без команды починки — половина работы. Тег без релиза обычным
+# прогоном не чинится НИКОГДА (релизы делаются только для версий текущего прогона),
+# поэтому рядом с «не хватает: релиз» обязана стоять команда выхода.
+assert_contains "названа команда починки" "$OUT" "REPAIR=1"
 
 case_ "G13" "Распакованные зеркала убираются, рабочие клоны — никогда"
 D="$SANDBOX/tG13"; mkdir -p "$D"
@@ -1085,6 +1113,35 @@ printf 'testuser/nested-repo\n' > "$D/outer-repo-v1.0.0/nested-repo/.repo-id"
 printf '9.9.9' > "$D/outer-repo-v1.0.0/nested-repo/VERSION"
 OUT="$(KEEP_ARCHIVES=0 run_deploy "$D")"
 [ ! -d "$D/outer-repo-v1.0.0" ] && ok "зеркало убрано по корневому маркеру" || bad "зеркало убрано по корневому маркеру"
+
+case_ "H9" "Итоговая сводка не противоречит сама себе: снято то, что шаг 3 починил"
+# v4.17.1. Сверка repos-map идёт ДО регистрации новых реп, поэтому её вердикт
+# к моменту печати финального блока устаревает. Боевой прогон 21.08.2026 напечатал
+# подряд «добавлена в repos-map» и «нет в карте вовсе» про одну и ту же репу.
+# map_resolve вычёркивает зарегистрированные имена; строка уходит, если пусто.
+eval "$(sed -n '/^map_resolve(){/,/^}/p' "$DEPLOY")"
+
+LOUD="
+  repos-map: нет в карте вовсе — algorithms-site game-analytics-engine vevdokimovm. Репа без строки в карте считается незаведённой (протокол 07)
+  посторонний пункт, трогать нельзя"
+map_resolve "algorithms-site game-analytics-engine"
+assert_missing "разрешённое имя вычеркнуто" "$LOUD" "algorithms-site"
+assert_missing "и второе тоже" "$LOUD" "game-analytics-engine"
+assert_contains "неразрешённое осталось" "$LOUD" "vevdokimovm"
+assert_contains "посторонний пункт не тронут" "$LOUD" "посторонний пункт"
+
+LOUD="
+  repos-map: нет в карте вовсе — a-repo b-repo. Репа без строки в карте считается незаведённой (протокол 07)
+  посторонний пункт"
+map_resolve "a-repo b-repo"
+assert_missing "разрешены все — строка ушла целиком" "$LOUD" "нет в карте вовсе"
+assert_contains "но остальное на месте" "$LOUD" "посторонний пункт"
+
+# Пустой список ничего не ломает: шаг 3 мог не зарегистрировать ни одной репы.
+LOUD="
+  repos-map: нет в карте вовсе — c-repo. Репа без строки в карте считается незаведённой (протокол 07)"
+map_resolve ""
+assert_contains "пустой список — сводка не тронута" "$LOUD" "c-repo"
 
 # =============================================================================
 printf '\n\033[1m── Покрытие по зонам\033[0m\n'

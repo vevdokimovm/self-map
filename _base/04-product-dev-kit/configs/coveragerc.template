@@ -1,0 +1,20 @@
+[run]
+source = app
+omit =
+    */tests/*
+    */migrations/*
+    */alembic/*
+    */__init__.py
+
+[report]
+fail_under = 90
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if TYPE_CHECKING:
+    def __repr__
+
+# fail_under=90 — блокирующий гейт (STANDARD.md §1), не рекомендация. Для непубличного/
+# внутреннего инструмента порог можно снизить, но зафиксировать выбор ADR-ом, не молча.

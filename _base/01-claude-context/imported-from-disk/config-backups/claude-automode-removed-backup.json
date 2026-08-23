@@ -1,0 +1,46 @@
+{
+  "_note": "Блок autoMode, удалённый из ~/.claude/settings.json 2026-08-20. Сохранён, чтобы ничего не потерялось. Половина записей относится к finpilot, половина к base-repo — результат двух прогонов /auto-mode-setup, дописавших в один глобальный файл. Если понадобится — восстанавливать ТОЛЬКО в проектный .claude/settings.json нужной репы, не в глобальный.",
+  "autoMode": {
+    "soft_deny": [
+      "$defaults",
+      "Bash(alembic downgrade:*) — this repo's finpilot-alembic-migration skill documents that a PreToolUse hook already blocks this, but recon shows a plain-text CLAUDE.md/skill assertion only, not a confirmed live hook; flag as soft-deny pending confirmation",
+      "Bash(git push --force*) targeting this repo once a remote is configured — no remote/branch-protection data was gatherable",
+      "Bash(git push --force*) targeting this repo once a remote is configured — no remote/branch-protection data is gatherable yet"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: assume private — no git remote is configured for this repo (`~/Documents/finpilot`), and no gh visibility data was queryable; treat as private/local-only until a remote is added",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured — repo has a `.claude/hooks/block-secrets.sh` hook and `.gitignore` excludes `.env`, `.env.local`, `.env.*.local`; `deploy/env.prod.example` is a template, not a secret store",
+      "**Default / protected branches**: not queryable (no remote configured for this repo; gh check could not run) — treat any push/force-push as unverified-safety until a remote and branch protection are confirmed",
+      "**CI/CD deploy targets**: None configured — `.github/workflows` exists and `docker-compose.prod.yml` / `deploy/env.prod.example` suggest a prod deploy path, but no concrete target host was gathered",
+      "**Network posture**: None configured",
+      "**Source control**: The trusted repo and its remote(s) only (no additional orgs configured) — this repo currently has no git remote; treat all git remote/push operations as requiring confirmation until one is configured",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None configured — CLAUDE.md references `cbr-xml-daily.ru` as a public mirror fallback for a rate source, not an internal service",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: personal financial data (ФИО, contacts, income/expenses, balances, debts, goals) is regulated under 152-ФЗ per CLAUDE.md and the 152fz-guard skill; real personal data must never leave the RF-infrastructure boundary and must never appear in logs, error traces, or public mirrors — only synthetic data is used for development/testing; `tests/test_pii_privacy.py` and `.claude/hooks/block-secrets.sh` are enforcement points",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment — includes `docker-compose.prod.yml` and `deploy/env.prod.example` in this repo",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "**Repository visibility**: assume private — no git remote is configured for this repo (`~/Documents/base-repo`), and gh visibility data was not queryable; README.md itself states \"Все репы приватные и сугубо личные\" (all repos are private and strictly personal), consistent with private/local-only until a remote is added",
+      "**Secrets management**: None configured — repo's .gitignore excludes `.env`, `.env.*`, `*.key`, `secrets/`, `credentials*`, and 00-infrastructure/32-git-hooks-and-secret-scanning.md suggests a secret-scanning doc exists, but no concrete secrets-management system was gathered",
+      "**CI/CD deploy targets**: None configured",
+      "**Source control**: The trusted repo only (no git remote is configured for `~/Documents/base-repo`) — no additional orgs configured; treat all git remote/push operations as requiring confirmation until a remote is configured",
+      "**Key internal services**: None configured",
+      "**Sensitive data locations & audiences**: this is a personal knowledge-base repo (base-repo) described as private and strictly personal; treat any personal/career/instructional content under this repo as personal data scoped to the repo owner only — no additional regulated-data categories were gathered",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development — FINPILOT, a personal-finance decision-support system (RF market, 152-ФЗ compliance required)",
+      "**Trusted repo**: `~/Documents/finpilot` (this checkout) — no git remote is configured, so there is no corroborated public/private status from a remote; treat as private/local and do not assume any GitHub org ownership without a configured remote",
+      "**Org-specific CLIs**: None configured",
+      "(routine-under-prefix qualifiers): none found",
+      "**Primary use of Claude Code**: software development — personal knowledge-base infrastructure (base-repo), a base class for the user's other knowledge repos (methodology library, role kits, product-dev kit, reporting templates)",
+      "**Trusted repo**: `~/Documents/base-repo` (this checkout) — no git remote is configured, so there is no corroborated public/private status from a remote; README.md asserts it is private and personal, but treat as private/local and do not assume any GitHub org ownership without a configured remote"
+    ]
+  }
+}

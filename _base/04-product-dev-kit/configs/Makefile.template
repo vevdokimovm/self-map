@@ -1,0 +1,35 @@
+# Скопировать в Makefile корня проекта. Цели соответствуют трём тирам CI (STANDARD.md §2).
+
+.PHONY: test test-fast test-full test-deep lint typecheck coverage preflight install
+
+install:
+	pip install -r requirements.txt -r requirements-dev.txt
+	pre-commit install
+
+test-fast:
+	pytest -m fast
+
+test-full:
+	pytest -m full
+
+test-deep:
+	pytest -m deep
+
+coverage:
+	pytest -m fast --cov=app --cov-report=term-missing --cov-fail-under=90
+
+lint:
+	flake8 . || true
+	mypy . || true
+
+# Версионная церемония как гейт, не ручная память — STANDARD.md §3.
+# Проверяет: VERSION совпадает с последней записью CHANGELOG, тег (если есть) совпадает с VERSION.
+preflight:
+	python3 -c "\
+import re,sys; \
+v=open('VERSION').read().strip(); \
+cl=open('CHANGELOG.md').read(); \
+m=re.search(r'\[([0-9]+\.[0-9]+\.[0-9]+)\]', cl); \
+sys.exit(0) if m and m.group(1)==v else (print(f'VERSION={v} != CHANGELOG top={m.group(1) if m else None}'), sys.exit(1))"
+
+test: preflight test-fast

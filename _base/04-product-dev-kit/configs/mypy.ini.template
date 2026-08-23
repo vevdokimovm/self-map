@@ -1,0 +1,11 @@
+[mypy]
+python_version = 3.11
+warn_return_any = True
+warn_unused_configs = True
+disallow_untyped_defs = False
+ignore_missing_imports = True
+exclude = (alembic|migrations|tests)/
+
+# disallow_untyped_defs=False сознательно: типы обязательны на сигнатурах публичных функций по
+# ../../00-infrastructure/python-backend.md, но mypy как CI-гейт держим информационным (см.
+# ../STANDARD.md §2) — не блокировать релиз из-за типа во внутренней утилите.

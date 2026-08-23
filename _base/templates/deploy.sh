@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# deploy.sh — ЕДИНЫЙ деплойер репозиториев. Один скрипт на всю систему.
+# deploy.sh v4.17.2 — ЕДИНЫЙ деплойер репозиториев. Один скрипт на всю систему.
 #
 # ┌───────────────────────────────────────────────────────────────────────────┐
 # │ ЖЕЛЕЗНОЕ ПРАВИЛО: ВТОРОГО СКРИПТА НЕ ЗАВОДИТСЯ. НИКОГДА.                   │
@@ -44,6 +44,13 @@
 # ПЕРЕКЛЮЧАТЕЛИ (env):
 #   DRY=1          показать план и выйти. Ничего не меняет ни локально, ни на GitHub
 #   ONLY="a b"     обработать только эти репы
+#   MIRRORS_ONLY=1 обработать ВСЕ зеркала из MIRRORS одной командой.
+#                  Массовый прогон зеркала пропускает намеренно (иначе туда уедет
+#                  лишнее), и перечислять их руками каждый раз — прямой путь
+#                  к тому, что однажды забудешь одно. Ключ раскрывается в ONLY
+#                  со списком MIRRORS, дальше работает та же проверенная ветка.
+#                  ONLY=1 сделать нельзя: ONLY — это СПИСОК ИМЁН, и "1" будет
+#                  понято как репа с именем 1.
 #   SKIP="a b"     не трогать эти репы вообще
 #   REPAIR=1       ТОЛЬКО починка: пройтись по существующим тегам/релизам и привести
 #                  к стандарту (заголовок, описание из CHANGELOG, недостающий ассет).
@@ -90,7 +97,13 @@ REMOTE_BASE="${REMOTE_BASE:-https://github.com/$OWNER}"   # переопреде
 MIN_FILES="${MIN_FILES:-5}"
 PRIVATE="${PRIVATE:-1}"
 ASSET="${ASSET:-1}"
-SCRIPT_VERSION="4.3.2"
+SCRIPT_VERSION="4.17.2"
+# Накопители по релизам. Объявлены здесь, а не в блоке 2Б: ветка REPAIR (шаг 2А)
+# вызывает ensure_release раньше, и под `set -u` обращение к необъявленной ASSET_OK
+# роняло весь прогон уже ПОСЛЕ создания релиза — работа сделана, а код возврата ошибка.
+ASSET_OK=""
+NOREL=""
+MIRROR_SKIPPED=""
 DRY="${DRY:-0}"
 AUDIT="${AUDIT:-0}"          # 1 = полная ревизия ВСЕХ релизов (долго)
 VERIFY="${VERIFY:-0}"        # 1 = только проверка «что можно удалять локально»
@@ -104,6 +117,30 @@ ALL_REPOS="${ALL_REPOS:-0}"  # 1 = взять ВСЕ репы из repos-map, а
 KEEP_ARCHIVES="${KEEP_ARCHIVES:-0}"
 DELETE_AFTER="${DELETE_AFTER:-1}"
 [ "$KEEP_ARCHIVES" = "1" ] && DELETE_AFTER=0
+CHLOG_FILL="${CHLOG_FILL:-0}"  # 1 = дописать секции и разряды в CHANGELOG по данным git
+# Публичные зеркала не трогаются массовыми режимами: служебные файлы в витрине
+# посторонним не нужны (08.08.2026 в публичную finpilot так уехала вся _base/).
+# Назвал репу явно через ONLY — значит осознанно, тогда работаем.
+# Витрина по ADR-009: КАЖДОЕ зеркало вносится сюда в момент создания, а не после
+# первого инцидента. 15.08.2026 три зеркала были заведены и открыты в public раньше,
+# чем попали в этот список, — окно, в котором sync-base.sh залил бы в них _base/.
+# 🔴 Список ПУБЛИЧНЫХ реп: массовые режимы их пропускают, база в них не раздаётся.
+# Обновлён 21.08.2026 — четыре репы были опубликованы в тот же день и в список
+# не попали: algorithms-site, game-analytics-engine, claude-usage, salvation.
+# Это ровно PIT-097 («список — намерение, свойство объекта — факт»): держать список
+# в синхроне с GitHub руками невозможно, поэтому ниже стоит предохранитель по факту.
+# Сверить список с реальностью:
+#   gh repo list vevdokimovm --limit 200 --json name,visibility \
+#     --jq '.[]|select(.visibility=="PUBLIC")|.name'
+MIRRORS="${MIRRORS:-finpilot finpilot-mirror finpilot-public-mirror vk-graph health-report-generator bron-kerbosch algorithms-site game-analytics-engine claude-usage salvation}"
+MIRRORS_ONLY="${MIRRORS_ONLY:-0}"
+if [ "$MIRRORS_ONLY" = "1" ]; then
+  if [ -n "${ONLY:-}" ]; then
+    echo "MIRRORS_ONLY=1 и ONLY заданы вместе — выбери одно" >&2; exit 2
+  fi
+  ONLY="$MIRRORS"
+  export ONLY
+fi
 MIN_FREE_MB="${MIN_FREE_MB:-2048}"  # ниже этого порога свободного места прогон не начинается
 KEEP_LEGACY_ASSETS="${KEEP_LEGACY_ASSETS:-0}"   # 1 = НЕ снимать дубли (страховка)
 DROP_LEGACY_ASSETS="${DROP_LEGACY_ASSETS:-1}"   # оставлен для совместимости
@@ -118,7 +155,19 @@ SERVICE_RE="${SERVICE_RE:-^([0-9]+|files([ _-][0-9]+)?|[Aa]rchive([ _-][0-9]+)?|
 VARIANT_REPOS="${VARIANT_REPOS:-finpilot}"
 # имя архива != имя репы. Историческое: архивы finpilot_* принадлежат personal-finance-dss
 # (finpilot — публичное зеркало). Формат: "имя-в-архиве=имя-репы имя2=репа2"
-REPO_MAP="${REPO_MAP:-finpilot=personal-finance-dss}"
+# finpilot-public-mirror=finpilot (2026-08-13, personal-finance-dss v8.19.3): владелец
+# ЯВНО решил — репозиторий на GitHub остаётся называться просто `finpilot` (переименование
+# туда-обратно проверено в этой же сессии), а АРХИВ санитизированного публичного среза
+# называется finpilot-public-mirror-vX.Y.Z.zip — так понятнее у него на диске, не
+# finpilot-vX.Y.Z.zip (то имя занято старой историей выше и уже участвует в сравнении с
+# .repo-id). Санитайзер (tools/publish/finpilot_publish_public.sh) не пишет .repo-id в
+# собранное дерево, так что здесь ИМЕННО карта — единственный способ довести архив до
+# реальной репы finpilot, а не дать деплойеру завести пустую репу-сироту
+# finpilot-public-mirror. finpilot-mirror=finpilot — более старое имя архива из той же
+# сессии, оставлено для совместимости с уже лежащим в Downloads finpilot-mirror-v8.19.2.zip.
+# Оба алиаса уже в MIRRORS ниже (защита от массовых режимов) — без строк карты они туда
+# не доезжали вообще, только пропускались.
+REPO_MAP="${REPO_MAP:-finpilot=personal-finance-dss finpilot-mirror=finpilot finpilot-public-mirror=finpilot}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   # ТОЛЬКО ЯРКИЕ ЦВЕТА (91-97). Фон у владельца чёрный, поэтому запрещены:
@@ -140,8 +189,53 @@ mag(){ printf '%s%s%s\n' "$C_MAG" "$*" "$C_OFF"; }
 bld(){ printf '%s%s%s\n' "$C_BLD" "$*" "$C_OFF"; }
 # fail loud: то, что скрипт чинить НЕ станет — человек решает сам
 LOUD=""
+# PIT-016: печать шла в stdout. Любая функция, вызвавшая loud внутри `$( )`,
+# отдавала наверх не результат, а раскрашенную строку «ТРЕБУЕТ РЕШЕНИЯ:».
+# Так родился заголовок релиза finpilot, начинающийся с \033[1;97m\033[95m.
+# Диагностика всегда идёт в stderr — stdout принадлежит результату функции.
 loud(){ LOUD="$LOUD
-  $1"; printf '%s%s  ТРЕБУЕТ РЕШЕНИЯ: %s%s\n' "$C_BLD" "$C_MAG" "$1" "$C_OFF"; }
+  $1"; printf '%s%s  ТРЕБУЕТ РЕШЕНИЯ: %s%s\n' "$C_BLD" "$C_MAG" "$1" "$C_OFF" >&2; }
+
+# v4.17.1: сводка карты снимается, когда шаг 3 её же и починил.
+# Сверка repos-map идёт ДО регистрации новых реп, поэтому её вердикт к моменту
+# печати финального блока устаревает. Боевой прогон 21.08.2026 напечатал подряд:
+#   "algorithms-site — repos-map добавлена (требует описания)"
+#   "ТРЕБУЕТ ТВОЕГО РЕШЕНИЯ: repos-map: нет в карте вовсе — algorithms-site ..."
+# Две строки, вторая опровергает первую. Владелец справедливо спросил, не сломан ли
+# скрипт: публикация-то отработала верно. Молчаливое противоречие в итоговом блоке
+# хуже отсутствия блока — читающий перестаёт доверять ВСЕМУ списку, включая
+# настоящие пункты. Здесь имена, зарегистрированные шагом 3, вычёркиваются
+# из строки MISSING; если вычеркнулись все — строка уходит целиком.
+map_resolve(){
+  [ -n "$LOUD" ] && [ -n "${1:-}" ] || return 0
+  _new="$(LOUD_IN="$LOUD" RESOLVED="$1" python3 - <<'PYRES'
+import os, re
+loud = os.environ.get("LOUD_IN", "")
+done = set(os.environ.get("RESOLVED", "").split())
+out = []
+for line in loud.split("\n"):
+    if "нет в карте вовсе" in line and done:
+        m = re.search(r"—\s*([^.]*?)\.", line)
+        if m:
+            names = [n for n in m.group(1).split() if n not in done]
+            if not names:
+                continue
+            line = line[:m.start(1)] + " ".join(names) + line[m.end(1):]
+    out.append(line)
+print("\n".join(out))
+PYRES
+)" || return 0
+  LOUD="$_new"
+}
+
+# PIT-016 (вторая половина): заголовок релиза не может содержать управляющих
+# символов, чем бы ни закончилась его сборка. Санитайзер — последний рубеж,
+# он ловит и будущие протечки, а не только известную.
+safe_title(){
+  _t="$(printf '%s' "$1" | LC_ALL=C sed $'s/\033\\[[0-9;]*[A-Za-z]//g' | tr -d '\001-\037\177')"
+  _t="${_t#"${_t%%[![:space:]]*}"}"; _t="${_t%"${_t##*[![:space:]]}"}"
+  case "$_t" in ''|*"ТРЕБУЕТ РЕШЕНИЯ"*) printf '%s v%s' "$2" "$3" ;; *) printf '%s' "$_t" ;; esac
+}
 die(){ red "ОШИБКА: $*"; [ -n "${WORK:-}" ] && [ -d "${WORK:-}" ] && red "Рабочая папка сохранена: $WORK"; exit 1; }
 
 retry(){ d="$1"; shift; a=1; s="$RETRY_SLEEP"
@@ -161,6 +255,203 @@ HAVE_GH=0; command -v gh >/dev/null 2>&1 && HAVE_GH=1
 [ "$HAVE_GH" -eq 1 ] || ylw "⚠ gh не найден: пуш и теги пройдут, релизы придётся создать вручную"
 [ -d "$DIR" ] || die "папка не найдена: $DIR"
 [ "$ASSET" = "0" ] && ylw "⚠ ASSET=0 — релизы будут без канонического zip (нарушение §4 стандарта)"
+
+# --- восстановление пропущенных секций CHANGELOG (режим CHLOG_FILL) --------------
+# Отдельного скрипта не заводим (§иронное правило файла): это РЕЖИМ внутри deploy.sh.
+CHFILL="$(mktemp -d)/chlog_fill.py"
+cat > "$CHFILL" <<'FILLEOF'
+#!/usr/bin/env python3
+"""Restores missing CHANGELOG sections for tags that never got one.
+
+Reads everything from git — tag date, commit subject, diff stat — and invents
+nothing. Called by deploy.sh in CHLOG_FILL mode.
+
+    chlog_fill.py <clone-dir> <repo-name>
+
+Prints the versions it added, one per line. Exit 1 when nothing was missing.
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+from datetime import date
+from pathlib import Path
+
+HEAD_RE = re.compile(r"^##\s+\[?v?(\d+)\.(\d+)\.(\d+)\]?")
+BUMP_TAIL = re.compile(r"\((MAJOR|MINOR|PATCH)\)\s*$")
+BUMP_HEAD = re.compile(r"(MAJOR|MINOR|PATCH)\s*[:\u2014\u2013-]")
+DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+DASHES = "\u2014\u2013-"
+
+
+def git(clone: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(clone), *args], capture_output=True, text=True, encoding="utf-8"
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def parse(version: str) -> tuple[int, int, int]:
+    parts = (version.split(".") + ["0", "0"])[:3]
+    return tuple(int(re.sub(r"\D", "", p) or 0) for p in parts)
+
+
+def bump_of(current: str, previous: str | None) -> str:
+    if previous is None:
+        return "MAJOR"
+    cur, prev = parse(current), parse(previous)
+    if cur[0] != prev[0]:
+        return "MAJOR"
+    return "MINOR" if cur[1] != prev[1] else "PATCH"
+
+
+def thesis_of(subject: str, repo: str, version: str) -> str:
+    text = re.sub(rf"^{re.escape(repo)}\s+v?{re.escape(version)}\s*", "", subject or "")
+    text = text.lstrip(DASHES + " ").strip()
+    return text or "восстановлено по журналу git"
+
+
+def touched_dirs(clone: Path, previous: str | None, version: str) -> str:
+    if previous is None:
+        names = git(clone, "show", "--pretty=", "--name-only", f"v{version}")
+    else:
+        names = git(clone, "diff", "--name-only", f"v{previous}", f"v{version}")
+    dirs = []
+    for line in names.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        dirs.append(line.rsplit("/", 1)[0] + "/" if "/" in line else "(корень)")
+    ordered = sorted(set(dirs))
+    shown = ", ".join(ordered[:6])
+    return shown + (f" и ещё {len(ordered) - 6}" if len(ordered) > 6 else "")
+
+
+def stat_of(clone: Path, previous: str | None, version: str) -> str:
+    if previous is None:
+        raw = git(clone, "show", "--shortstat", "--pretty=", f"v{version}")
+    else:
+        raw = git(clone, "diff", "--shortstat", f"v{previous}", f"v{version}")
+    raw = raw.strip().splitlines()
+    return raw[-1].strip() if raw else "объём изменений не определён"
+
+
+def build_section(clone: Path, repo: str, version: str, previous: str | None) -> str:
+    when = git(clone, "log", "-1", "--format=%ad", "--date=short", f"v{version}") or str(date.today())
+    subject = git(clone, "log", "-1", "--format=%s", f"v{version}")
+    lines = [
+        f"## [{version}] — {when} — {thesis_of(subject, repo, version)} ({bump_of(version, previous)})",
+        "",
+        "Секция восстановлена по данным git: релиз выпускался без записи в журнале,",
+        "а архив к этому моменту уже удалён. Ниже только то, что читается из репозитория.",
+        "",
+        f"- {stat_of(clone, previous, version)}",
+    ]
+    dirs = touched_dirs(clone, previous, version)
+    if dirs:
+        lines.append(f"- затронуты: {dirs}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def normalize(clone: Path, repo: str, lines: list[str], tags: list[str]) -> tuple[list[str], list[str]]:
+    """Дописывает разряд в заголовки, где его нет. Разряд считается по номерам версий,
+    поэтому ничего не выдумывается — он и так однозначно следует из SemVer.
+
+    Предшественник берётся из списка ТЕГОВ, а не из порядка в журнале: журнал может
+    пропускать версии, и тогда сосед по файлу — не тот, с кем надо сравнивать.
+    """
+    before = {v: (tags[i - 1] if i else None) for i, v in enumerate(tags)}
+
+    fixed: list[str] = []
+    changed: list[str] = []
+    for line in lines:
+        match = HEAD_RE.match(line)
+        if not match:
+            fixed.append(line)
+            continue
+        version = ".".join(match.groups())
+        if BUMP_TAIL.search(line) or BUMP_HEAD.search(line):
+            fixed.append(line)
+            continue
+        earlier = before.get(version)
+        head = line.rstrip()
+        tail = re.sub(r"^##\s+\[?v?" + re.escape(version) + r"\]?\s*", "", head)
+        tail = tail.lstrip(DASHES + " ").strip()
+        when = DATE_RE.search(tail)
+        rest = DATE_RE.sub("", tail, count=1).lstrip(DASHES + " ").strip() if when else tail
+        if not rest:
+            rest = thesis_of(git(clone, "log", "-1", "--format=%s", f"v{version}"), repo, version)
+        parts = [f"## [{version}]"]
+        if when:
+            parts.append(when.group(0))
+        parts.append(f"{rest} ({bump_of(version, earlier)})")
+        fixed.append(" — ".join(parts))
+        changed.append(version)
+    return fixed, changed
+
+
+def main() -> int:
+    clone, repo = Path(sys.argv[1]), sys.argv[2]
+    changelog = clone / "CHANGELOG.md"
+    if not changelog.exists():
+        changelog.write_text(
+            f"# CHANGELOG — {repo}\n\nФормат: Keep a Changelog · версии по SemVer.\n",
+            encoding="utf-8",
+        )
+
+    tags = sorted(
+        (t[1:] for t in git(clone, "tag", "-l", "v*").splitlines() if t.strip()),
+        key=parse,
+    )
+    if not tags:
+        return 1
+
+    text = changelog.read_text(encoding="utf-8")
+    lines, normalized = normalize(clone, repo, text.splitlines(), tags)
+    if normalized:
+        text = "\n".join(lines) + "\n"
+        changelog.write_text(text, encoding="utf-8")
+        print("норм:" + ",".join(normalized), file=sys.stderr)
+    have = {".".join(m.groups()) for m in (HEAD_RE.match(ln) for ln in text.splitlines()) if m}
+
+    sections: list[tuple[str, str]] = []
+    previous: str | None = None
+    for version in tags:
+        if version not in have:
+            sections.append((version, build_section(clone, repo, version, previous)))
+        previous = version
+
+    if not sections:
+        return 0 if normalized else 1
+
+    # Пересобираем журнал: преамбула, затем ВСЕ секции по убыванию версии.
+    # Простая вставка новых секций перед первой существующей ставила версию
+    # из середины истории наверх — порядок обязан считаться по номерам, не по месту.
+    lines = text.splitlines()
+    heads = [i for i, ln in enumerate(lines) if HEAD_RE.match(ln)]
+    preamble = "\n".join(lines[: heads[0]]).rstrip() if heads else text.rstrip()
+
+    blocks: list[tuple[str, str]] = []
+    for pos, start in enumerate(heads):
+        end = heads[pos + 1] if pos + 1 < len(heads) else len(lines)
+        version = ".".join(HEAD_RE.match(lines[start]).groups())
+        blocks.append((version, "\n".join(lines[start:end]).rstrip()))
+    blocks.extend((version, body.rstrip()) for version, body in sections)
+    blocks.sort(key=lambda b: parse(b[0]), reverse=True)
+
+    merged = preamble + "\n\n" + "\n\n".join(body for _, body in blocks) + "\n"
+    changelog.write_text(merged, encoding="utf-8")
+
+    print("\n".join(version for version, _ in sections))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+FILLEOF
 
 # --- парсер CHANGELOG (питон: UTF-8, кириллица, тире) ---------------------------
 PARSER="$(mktemp -d)/chlog.py"
@@ -202,8 +493,16 @@ tail = re.sub(r"^\[?v?\d+\.\d+\.\d+\]?\s*", "", tail)
 tail = re.sub(r"^[—\-–]\s*", "", tail)
 tail = re.sub(r"^\d{4}-\d{2}-\d{2}\s*", "", tail)
 tail = re.sub(r"^[—\-–]\s*", "", tail)
+# Канон §2 — разряд в скобках в конце: «— тезис (MINOR)».
+# Но генератор скелетов с самого начала писал «— MINOR: тезис», и в этом диалекте
+# сейчас живут журналы почти всех реп. Раз файлов больше, чем правил, парсер обязан
+# понимать оба и приводить к канону сам, а не сыпать предупреждением на каждой версии.
 bump = re.search(r"\((MAJOR|MINOR|PATCH)\)\s*$", tail)
-thesis = re.sub(r"\s*\((MAJOR|MINOR|PATCH)\)\s*$", "", tail).strip()
+if bump:
+    thesis = re.sub(r"\s*\((MAJOR|MINOR|PATCH)\)\s*$", "", tail).strip()
+else:
+    bump = re.match(r"^(MAJOR|MINOR|PATCH)\s*[:\u2014\u2013-]\s*", tail)
+    thesis = tail[bump.end():].strip() if bump else tail.strip()
 
 text = "\n".join(body).strip("\n")
 while text.startswith("---"):
@@ -262,12 +561,21 @@ gh_try(){
 # «запрос не прошёл» (сеть/таймаут) — во втором случае возвращает 2 и версия
 # не считается отсутствующей. Раньше оба случая выглядели одинаково, и скрипт
 # пытался создать уже существующий релиз.
+# Возвращает: 0 — релиз есть · 1 — релиза нет · 2 — ответить невозможно (сеть/API).
+# Текст ошибки кладётся в RELEASE_STATE_ERR, чтобы вызывающий МОГ ЕГО ПОКАЗАТЬ.
+# Раньше он молча терялся, и на экран уходила зашитая фраза «GitHub недоступен» —
+# то есть догадка вместо факта. Причин у кода 2 минимум шесть (502/503/504, таймаут,
+# сброс соединения, DNS), лечатся они по-разному: 71-fail-loud-and-sourcing.md §7г.
+RELEASE_STATE_ERR=""
 release_state(){
+  RELEASE_STATE_ERR=""
   _out="$(gh_try release view "v$2" --repo "$OWNER/$1" --json name 2>&1)"; _rc=$?
   [ "$_rc" -eq 0 ] && return 0
   case "$_out" in
     *timeout*|*"connection reset"*|*"could not resolve"*|*"TLS handshake"*|\
-    *"i/o timeout"*|*"502"*|*"503"*|*"504"*) return 2 ;;
+    *"i/o timeout"*|*"502"*|*"503"*|*"504"*|*"429"*|*"rate limit"*|*"secondary rate"*)
+      RELEASE_STATE_ERR="$(printf '%s' "$_out" | tr '\n' ' ' | cut -c1-200)"
+      return 2 ;;
   esac
   return 1
 }
@@ -383,23 +691,34 @@ cleanup_mirrors(){
 # Канон — корень репы (§46), но исторически файл живёт и в docs/, и в
 # 00-infrastructure/, и глубже. Ищем везде и выбираем тот, где ЕСТЬ секция версии:
 # наличие секции — единственный надёжный признак «это наш журнал».
+# RELEASES.md — признанный альтернативный формат (найдено 2026-08-13 на репе finpilot,
+# синк из архива finpilot-public-mirror-v8.19.2.zip: приватный монорепо намеренно НЕ
+# публикует CHANGELOG.md — 300+ КБ внутренней кухни процесса — и вместо него держит
+# отдельный RELEASES.md, переписанный с нуля под публичную историю версий; без этой
+# строки поиск ничего не находил, релиз создавался без описания). Приоритет —
+# CHANGELOG*, RELEASES только если чейнджлога нет вовсе, чтобы не подменять более
+# подробный источник.
 # find_changelog <корень> <версия> -> путь или пусто
 find_changelog(){
   _root="$1"; _fv="$2"
   # 1) приоритетные места по порядку
   for _c in "$_root/CHANGELOG.md" "$_root/docs/CHANGELOG.md" \
-            "$_root/00-infrastructure/CHANGELOG.md" "$_root/CHANGELOG" "$_root/Changelog.md"; do
+            "$_root/00-infrastructure/CHANGELOG.md" "$_root/CHANGELOG" "$_root/Changelog.md" \
+            "$_root/RELEASES.md" "$_root/docs/RELEASES.md"; do
     [ -f "$_c" ] && LC_ALL=C grep -qE "^#+ *\\[?$_fv\\]?( |\$|—|-)" "$_c" 2>/dev/null && { printf '%s' "$_c"; return 0; }
   done
   # 2) поиск по всему дереву — сначала тот, где есть секция версии
-  _found="$(find "$_root" -maxdepth 4 -iname 'CHANGELOG*.md' \
+  _found="$(find "$_root" -maxdepth 4 \( -iname 'CHANGELOG*.md' -o -iname 'RELEASES.md' \) \
               ! -path '*/node_modules/*' ! -path '*/.git/*' ! -path '*/_archive/*' \
               ! -iname '*TEMPLATE*' ! -iname '*repos-map*' 2>/dev/null)"
   for _c in $_found; do
     LC_ALL=C grep -qE "^#+ *\\[?$_fv\\]?( |\$|—|-)" "$_c" 2>/dev/null && { printf '%s' "$_c"; return 0; }
   done
-  # 3) секции нет нигде — вернём хоть какой-то журнал (приоритет корню)
-  for _c in "$_root/CHANGELOG.md" "$_root/docs/CHANGELOG.md" "$_root/00-infrastructure/CHANGELOG.md"; do
+  # 3) секции нет нигде — вернём хоть какой-то журнал (приоритет корню, CHANGELOG
+  #    приоритетнее RELEASES — если оба есть без секции, вероятнее не хватает
+  #    записи в основном журнале, а не то, что нужно переключаться на запасной)
+  for _c in "$_root/CHANGELOG.md" "$_root/docs/CHANGELOG.md" "$_root/00-infrastructure/CHANGELOG.md" \
+            "$_root/RELEASES.md" "$_root/docs/RELEASES.md"; do
     [ -f "$_c" ] && { printf '%s' "$_c"; return 0; }
   done
   for _c in $_found; do [ -f "$_c" ] && { printf '%s' "$_c"; return 0; }; done
@@ -502,7 +821,7 @@ ensure_release(){
         && { grn "    ✓ релиз v$_v (+ассет $_aname)"; note "$_r|v$_v|релиз|создан"
              # помечаем ассет подтверждённым: иначе автоудаление архива не сработает
              # для только что созданных релизов (эта ветка выходит из функции раньше)
-             ASSET_OK="$ASSET_OK $_v"; } \
+             ASSET_OK="${ASSET_OK:-} $_v"; } \
         || { red "    ✗ релиз v$_v не создан"; note "$_r|v$_v|релиз|✗ ошибка"; }
       rm -f "$WORK/$_aname"; return 0
     fi
@@ -542,7 +861,7 @@ ensure_release(){
             note "$_r|v$_v|ассет|✗ размер не сошёлся"
           else
             grn "    ✓ v$_v: ассет $_aname догружен (из: $_src)"; note "$_r|v$_v|ассет|догружен ($_src)"
-            ASSET_OK="$ASSET_OK $_v"
+            ASSET_OK="${ASSET_OK:-} $_v"
           fi
         else
           red "    ✗ v$_v: ассет не загрузился"; note "$_r|v$_v|ассет|✗ ошибка"
@@ -664,21 +983,33 @@ for z in "$DIR"/*.zip; do
   fi
   name="${parsed%% *}"; ver="${parsed#* }"
   name="$(printf '%s' "$name" | sed -E 's/[-_. ]+$//')"
-  # переименование по карте: архив едет в ту репу, которой принадлежит
-  for _m in $REPO_MAP; do
-    case "$_m" in
-      "$name="*) _t="${_m#*=}"
-        [ "$_t" != "$name" ] && MAPPED="$MAPPED
+  # Переименование по карте применяется ТОЛЬКО если в архиве нет .repo-id.
+  # .repo-id — заявление владельца о принадлежности архива, и оно старше карты.
+  # Без этого приоритета архив finpilot-vX.Y.Z.zip с .repo-id=finpilot уезжал бы
+  # в personal-finance-dss по исторической записи карты, а потом отбраковывался
+  # проверкой ниже как «.repo-id ≠ целевая репа». Ровно этот тупик и случился 08.08.
+  _has_rid=0
+  unzip -Z1 "$z" 2>/dev/null | LC_ALL=C grep -qE '^([^/]+/)?\.repo-id$' && _has_rid=1
+  if [ "$_has_rid" -eq 0 ]; then
+    for _m in $REPO_MAP; do
+      case "$_m" in
+        "$name="*) _t="${_m#*=}"
+          [ "$_t" != "$name" ] && MAPPED="$MAPPED
   $base.zip → репозиторий $_t (архив назван $name)"
-        name="$_t";;
-    esac
-  done
+          name="$_t";;
+      esac
+    done
+  fi
 
   # ПРЕДПОЛЁТНАЯ ПРОВЕРКА (дёшево — по списку файлов, без распаковки).
   # Делается ДО создания репы: иначе битый архив успевал породить на GitHub пустую
   # репу-сироту, которую потом руками удалять. Поймано тестом 21.
-  if ! unzip -l "$z" >/dev/null 2>&1; then
-    red "  ✗ $base.zip — битый архив (не читается), пропускаю"; continue
+  if ! unzip -t "$z" >/dev/null 2>&1; then
+    sleep 3
+    if ! unzip -t "$z" >/dev/null 2>&1; then
+      red "  ✗ $base.zip — битый архив (не читается), пропускаю"; continue
+    fi
+    ylw "  ~ $base.zip — дочитался со второй попытки (файл ещё писался)"
   fi
   # LC_ALL=C: имена внутри архивов бывают не в UTF-8 (кириллица в CP1251, macOS-NFD).
   # BSD-шные cut/grep под UTF-8 локалью на таких байтах падают с Illegal byte sequence.
@@ -707,7 +1038,7 @@ for z in "$DIR"/*.zip; do
     # Сравниваем с ЦЕЛЕВОЙ репой (после REPO_MAP): у finpilot имя архива и репа
     # намеренно разные, и это не ошибка.
     if [ -n "$_ridrepo" ] && [ "$_ridrepo" != "$name" ]; then
-      red "  ✗ $base.zip — .repo-id внутри указывает на «$_ridrepo», целевая репа «$name» — пропускаю"
+      red "  ✗ $base.zip — .repo-id внутри указывает на «${_ridrepo}», целевая репа «${name}» — пропускаю"
       loud "$base.zip: .repo-id=$_ridrepo ≠ $name. Архив уехал бы не в ту репу."
       continue
     fi
@@ -733,9 +1064,15 @@ for z in "$DIR"/*.zip; do
   if [ -n "${ONLY:-}" ]; then
     keep=0; for o in $ONLY; do [ "$name" = "$o" ] && keep=1; done
     [ "$keep" = "1" ] || continue
+  else
+    for m in ${MIRRORS:-}; do
+      [ "$name" = "$m" ] && { MIRROR_SKIPPED="$MIRROR_SKIPPED $m"; skip=1; }
+    done
+    [ "$skip" = "1" ] && continue
   fi
   printf '%s\t%s\t%s\n' "$name" "$ver" "$z" >> "$INDEX"
 done
+[ -n "$MIRROR_SKIPPED" ] && ylw "  ⊘ публичные зеркала пропущены:$MIRROR_SKIPPED (назови через ONLY, если надо)"
 [ "$N_SERVICE" -gt 0 ] && plain "  пропущено служебных архивов: $N_SERVICE (загрузки из чата, не наши артефакты)"
 if [ -n "$DUPES" ]; then
   echo ""; ylw "  рабочие копии и дубликаты — НЕ публикую (переименуй, если это поставка):"
@@ -755,31 +1092,53 @@ if [ -n "$UNKNOWN" ]; then
 fi
 
 if [ ! -s "$INDEX" ]; then
-  # Пустая папка — НЕ ошибка. После автоудаления или обычной уборки это ровно тот
-  # результат, к которому шли: всё опубликовано, локальных архивов не осталось.
-  # Раньше здесь печаталась «ОШИБКА» и возвращался ненулевой код на успешном исходе.
-  echo ""
-  grn "Публиковать нечего — версионных архивов в папке нет."
-  if [ "$N_SERVICE" -gt 0 ] || [ -n "$DUPES" ] || [ -n "$UNKNOWN" ]; then
-    plain "В папке остались только файлы, которые скрипт не публикует по определению:"
-    [ "$N_SERVICE" -gt 0 ] && plain "  · служебные загрузки из чата: $N_SERVICE"
-    [ -n "$DUPES" ]  && plain "  · рабочие копии и дубликаты"
-    [ -n "$UNKNOWN" ] && plain "  · архивы без версии в имени"
+  # Ремонтные режимы работают по тому, что уже на GitHub, и архив им не нужен —
+  # ровно наоборот, их запускают когда архив уже удалён как опубликованный.
+  # Ранний выход здесь глушил ASSETS_ONLY/REPAIR/CHLOG_FILL молча и с кодом 0:
+  # владелец видел «публиковать нечего» и считал, что починка отработала.
+  _repair_mode=0
+  for _m in "$REPAIR" "$ASSETS_ONLY" "$CHLOG_FILL" "$AUDIT" "$ALL_REPOS"; do
+    [ "$_m" = "1" ] && _repair_mode=1
+  done
+  if [ "$_repair_mode" = "1" ]; then
+    if [ -n "${ONLY:-}" ]; then
+      cyn "  архивов нет — ремонтный режим работает по списку ONLY: $ONLY"
+    else
+      ALL_REPOS=1
+      cyn "  архивов нет — ремонтный режим берёт репы из repos-map"
+    fi
+  else
+    # Пустая папка — НЕ ошибка. После автоудаления или обычной уборки это ровно тот
+    # результат, к которому шли: всё опубликовано, локальных архивов не осталось.
+    # Раньше здесь печаталась «ОШИБКА» и возвращался ненулевой код на успешном исходе.
+    echo ""
+    grn "Публиковать нечего — версионных архивов в папке нет."
+    if [ "$N_SERVICE" -gt 0 ] || [ -n "$DUPES" ] || [ -n "$UNKNOWN" ]; then
+      plain "В папке остались только файлы, которые скрипт не публикует по определению:"
+      [ "$N_SERVICE" -gt 0 ] && plain "  · служебные загрузки из чата: $N_SERVICE"
+      [ -n "$DUPES" ]  && plain "  · рабочие копии и дубликаты"
+      [ -n "$UNKNOWN" ] && plain "  · архивы без версии в имени"
+    fi
+    # Архивов нет, но распакованные зеркала могли остаться — убираем и их.
+    if [ "$DELETE_AFTER" = "1" ] && [ "$HAVE_GH" -eq 1 ]; then
+      echo ""; bld "── Убираю распакованные копии того, что полностью на GitHub"
+      MIR_DEL=0; cleanup_mirrors
+      [ "$MIR_DEL" -gt 0 ] && grn "  удалено: $MIR_DEL" || plain "  удалять нечего"
+    fi
+    echo ""
+    ylw "Если ждал другого — проверь папку и имена: канон <repo>-vX.Y.Z.zip"
+    ylw "Папка сейчас: $DIR"
+    exit 0
   fi
-  # Архивов нет, но распакованные зеркала могли остаться — убираем и их.
-  if [ "$DELETE_AFTER" = "1" ] && [ "$HAVE_GH" -eq 1 ]; then
-    echo ""; bld "── Убираю распакованные копии того, что полностью на GitHub"
-    MIR_DEL=0; cleanup_mirrors
-    [ "$MIR_DEL" -gt 0 ] && grn "  удалено: $MIR_DEL" || plain "  удалять нечего"
-  fi
-  echo ""
-  ylw "Если ждал другого — проверь папку и имена: канон <repo>-vX.Y.Z.zip"
-  ylw "Папка сейчас: $DIR"
-  exit 0
 fi
 
 REPOLIST="$(mktemp)"
 cut -f1 "$INDEX" | sort -u > "$REPOLIST"
+# ONLY в ремонтном режиме задаёт список напрямую: репы может не быть в индексе,
+# потому что её архив уже опубликован и удалён.
+if [ ! -s "$REPOLIST" ] && [ -n "${ONLY:-}" ]; then
+  for _o in $ONLY; do printf '%s\n' "$_o"; done | sort -u > "$REPOLIST"
+fi
 
 # ALL_REPOS=1: ревизия ВСЕХ реп системы, а не только тех, где нашлись архивы.
 # Список берём из repos-map.md (единственный реестр), фолбэк — gh repo list.
@@ -804,6 +1163,16 @@ if [ "$ALL_REPOS" = "1" ]; then
   elif [ "$HAVE_GH" -eq 1 ]; then
     gh repo list "$OWNER" --limit 200 --json name --jq '.[].name' 2>/dev/null | sort -u >> "$REPOLIST"
     ylw "  ALL_REPOS=1: карта не найдена, список взят из gh repo list"
+  fi
+  # Тот же фильтр, что и для архивов: список из repos-map не должен быть лазейкой,
+  # через которую массовый режим доберётся до публичного зеркала.
+  if [ -z "${ONLY:-}" ]; then
+    for m in ${MIRRORS:-}; do
+      if grep -qx "$m" "$REPOLIST" 2>/dev/null; then
+        grep -vx "$m" "$REPOLIST" > "$REPOLIST.tmp" && mv "$REPOLIST.tmp" "$REPOLIST"
+        MIRROR_SKIPPED="$MIRROR_SKIPPED $m"
+      fi
+    done
   fi
   sort -u "$REPOLIST" -o "$REPOLIST"
 fi
@@ -898,24 +1267,92 @@ while IFS= read -r REPO; do
     red "→ $REPO: GitHub не отвечает — пропускаю репу (перезапусти позже)"
     note "$REPO|—|репа|✗ сеть"; continue
   fi
+  # --- метаданные из .repo-meta (лежит в корне архива, едет вместе с деревом) ---
+  # Без этого описание = имя репы. Отсюда родился finpilot-mirror с описанием
+  # "finpilot-mirror". Берём из САМОГО СВЕЖЕГО архива репы: $ZIP здесь ещё не задан,
+  # он появляется ниже, внутри цикла по версиям.
+  DESC="$REPO"; TOPICS=""
+  _metazip="$(awk -F'\t' -v r="$REPO" '$1==r{v=$2; z=$3} END{if(z!="")print z}' "$INDEX")"
+  _metapath=""
+  if [ -n "${_metazip:-}" ] && [ -f "$_metazip" ]; then
+    _metapath="$(unzip -Z1 "$_metazip" 2>/dev/null | LC_ALL=C grep -E '(^|/)\.repo-meta$' | head -1)"
+  fi
+  if [ -n "${_metapath:-}" ]; then
+    _meta="$(unzip -p "$_metazip" "$_metapath" 2>/dev/null)"
+    _d="$(printf '%s\n' "$_meta" | LC_ALL=C grep -m1 '^description=' | cut -d= -f2-)"
+    TOPICS="$(printf '%s\n' "$_meta" | LC_ALL=C grep -m1 '^topics=' | cut -d= -f2-)"
+    [ -n "${_d:-}" ] && DESC="$_d"
+  fi
+
+  # Ремонтный режим чинит то, что УЖЕ есть, и создавать ничего не имеет права.
+  # 09.08.2026 ALL_REPOS взял список из repos-map, где оставалась строка про
+  # удалённую finpilot-mirror, — и деплойер молча создал её заново.
+  _repairing=0
+  for _m in "$REPAIR" "$ASSETS_ONLY" "$CHLOG_FILL" "$AUDIT" "$ALL_REPOS"; do
+    [ "$_m" = "1" ] && _repairing=1
+  done
+  if [ "$REPO_STATE" -eq 1 ] && [ "$_repairing" = "1" ]; then
+    red "→ $REPO: репы на GitHub нет — ремонтный режим НЕ создаёт репозитории"
+    ylw "   если она удалена намеренно — вычисти строку из repos-map.md"
+    note "$REPO|—|репа|✗ нет на GitHub, пропущена (ремонт)"
+    continue
+  fi
+
   if [ "$HAVE_GH" -eq 1 ] && [ "$REPO_STATE" -eq 1 ]; then
     VIS="--private"; [ "$PRIVATE" = "0" ] && VIS="--public"
     ylw "→ репозитория нет, создаю ($VIS)"
-    gh repo create "$OWNER/$REPO" $VIS --description "$REPO" >/dev/null \
+    gh repo create "$OWNER/$REPO" $VIS --description "$DESC" >/dev/null \
       || { red "не удалось создать $OWNER/$REPO — пропускаю репу"; note "$REPO|—|репа|✗ не создана"; continue; }
     grn "✓ репозиторий создан"; NEW_REPOS="$NEW_REPOS $REPO"
     note "$REPO|—|репа|СОЗДАНА (новая)"
   fi
 
+  # Описание и топики обновляются на КАЖДОМ прогоне, не только при создании:
+  # иначе существующие репы навсегда остаются с описанием от старого скрипта.
+  if [ "$HAVE_GH" -eq 1 ] && [ -n "${_metapath:-}" ]; then
+    gh repo edit "$OWNER/$REPO" --description "$DESC" >/dev/null 2>&1 \
+      && grn "  ✓ описание обновлено"
+    if [ -n "$TOPICS" ]; then
+      TOPIC_ARGS=""; _rest="$TOPICS"
+      while [ -n "$_rest" ]; do
+        t="${_rest%%,*}"
+        if [ "$t" = "$_rest" ]; then _rest=""; else _rest="${_rest#*,}"; fi
+        t="$(printf '%s' "$t" | tr -d ' ')"
+        [ -n "$t" ] && TOPIC_ARGS="$TOPIC_ARGS --add-topic $t"
+      done
+      [ -n "$TOPIC_ARGS" ] && gh repo edit "$OWNER/$REPO" $TOPIC_ARGS >/dev/null 2>&1 \
+        && grn "  ✓ топики: $TOPICS"
+    fi
+  fi
+
   CLONE="$WORK/$REPO"
   ylw "→ клонирую"
-  # Одна быстрая попытка. Ретраить с backoff имеет смысл только если репа ТОЧНО есть
-  # (тогда сбой = сетевой таймаут). Если репы нет — ретраи это просто минута впустую.
-  if ! git clone "$URL" "$CLONE" 2>/dev/null; then
+  # Прогресс печатается всегда: у крупных реп (portrait-of-taste, dota-dossier)
+  # клон идёт минутами, и без вывода невозможно отличить работу от зависшей сети.
+  # git отдаёт прогресс в stderr и только когда видит терминал — отсюда --progress.
+  # Пишем в файл и одновременно показываем последнюю строку, чтобы не терять текст
+  # ошибки: он нужен ниже, если клон упадёт.
+  _clone_log="$WORK/clone_$REPO.log"
+  : > "$_clone_log"
+  git clone --progress "$URL" "$CLONE" 2>"$_clone_log" &
+  _git_pid=$!
+  while kill -0 "$_git_pid" 2>/dev/null; do
+    _last="$(tr '\r' '\n' < "$_clone_log" 2>/dev/null | LC_ALL=C grep -E '[0-9]+%' | tail -1)"
+    [ -n "${_last:-}" ] && printf '\r    %-70s' "$(printf '%s' "$_last" | cut -c1-70)"
+    sleep 1
+  done
+  _clone_rc=0; wait "$_git_pid" || _clone_rc=$?
+  printf '\r%-76s\r' " "
+  _clone_err="$(tr '\r' '\n' < "$_clone_log" 2>/dev/null | tail -20)"
+  if [ "$_clone_rc" -eq 0 ]; then
+    _sz="$(du -sh "$CLONE" 2>/dev/null | cut -f1)"
+    grn "  ✓ склонировано${_sz:+ ($_sz)}"
+  else
     REPO_EXISTS=0
     [ "$REPO_STATE" -eq 0 ] && REPO_EXISTS=1
     if [ "$REPO_EXISTS" = "1" ]; then
       ylw "  репа существует — похоже на сетевой сбой, повторяю"
+      printf '%s\n' "$_clone_err" | tail -3 | sed 's/^/      /'
       retry "git clone" git clone "$URL" "$CLONE" 2>/dev/null \
         || { red "  клон не удался — пропускаю репу"; note "$REPO|—|клон|✗ сеть"; continue; }
     else
@@ -949,15 +1386,43 @@ while IFS= read -r REPO; do
   NOTES_DIR="$WORK/notes_$REPO"; mkdir -p "$NOTES_DIR"
   PUBLISHED=""
 
+  # --- 2Z. РЕЖИМ CHLOG_FILL: дописать секции журнала по данным git ---------------
+  # Нужен, когда тег и коммит уже на GitHub, а релиза нет из-за отсутствия секции,
+  # и локального архива тоже нет. Единственный источник о версии — сам репозиторий.
+  if [ "$CHLOG_FILL" = "1" ]; then
+    _fill="$(python3 "$CHFILL" "$CLONE" "$REPO" 2>"$WORK/fill_err.txt")"
+    if [ -n "$_fill" ]; then
+      grn "  ✓ журнал приведён к стандарту: $(printf '%s' "$_fill" | tr '\n' ' ')"
+      LC_ALL=C grep -q '^норм:' "$WORK/fill_err.txt" 2>/dev/null && \
+        cyn "    разряд дописан в заголовки: $(sed -n 's/^норм://p' "$WORK/fill_err.txt")"
+      ( cd "$CLONE" \
+        && git add CHANGELOG.md \
+        && git commit -q -m "$REPO — CHANGELOG приведён к стандарту по данным git" \
+        && git push -q origin "$BRANCH" ) \
+        && grn "  ✓ CHANGELOG запушен" \
+        || { red "  ✗ CHANGELOG не запушен"; note "$REPO|—|changelog|✗ push"; }
+    else
+      ylw "  секции CHANGELOG на месте — дописывать нечего"
+    fi
+    # дальше сразу приводим релизы к стандарту: ради этого режим и запускался
+    REPAIR=1
+  fi
+
   # --- 2A. РЕЖИМ REPAIR / ASSETS_ONLY: чиним существующее, новое не публикуем ----
   if [ "$REPAIR" = "1" ] || [ "$ASSETS_ONLY" = "1" ]; then
     for TAG in $TAGS; do
       V="${TAG#v}"
       case "$V" in ''|*[!0-9.]*) continue;; esac
       Z="$(awk -F'\t' -v r="$REPO" -v v="$V" '$1==r && $2==v{print $3; exit}' "$INDEX")"
-      TITLE="$(build_notes "$CLONE" "$V" "$REPO" "$NOTES_DIR/v$V.md")"
+      # PIT-016: код возврата build_notes не проверялся, и провал сборки описания
+      # уезжал в заголовок релиза целиком, вместе с цветовыми кодами.
+      TITLE="$(build_notes "$CLONE" "$V" "$REPO" "$NOTES_DIR/v$V.md")" || TITLE=""
+      TITLE="$(safe_title "$TITLE" "$REPO" "$V")"
       ylw "  → $TAG: $TITLE"
-      ensure_release "$REPO" "$V" "$NOTES_DIR/v$V.md" "$TITLE" "$Z"
+      # $CLONE обязателен шестым аргументом: без него ensure_release не соберёт
+      # канонический zip из тега (git archive), и версии, чей архив уже удалён,
+      # получат релиз без ассета. Ровно так вышло с portrait-of-taste 3.4.3–3.4.5.
+      ensure_release "$REPO" "$V" "$NOTES_DIR/v$V.md" "$TITLE" "$Z" "$CLONE"
     done
     continue
   fi
@@ -1007,7 +1472,7 @@ while IFS= read -r REPO; do
     _aid="$(find_repo_id "$SRC" || true)"
     if [ -n "$_aid" ]; then
       if [ "$_aid" != "$REPO" ]; then
-        red "  ✗ .repo-id внутри архива указывает на «$_aid», а публикуем в «$REPO» — СТОП"
+        red "  ✗ .repo-id внутри архива указывает на «${_aid}», а публикуем в «${REPO}» — СТОП"
         loud "$REPO v$VER: .repo-id=$_aid ≠ целевая репа. Архив уехал бы не туда."
         note "$REPO|v$VER|проверка|✗ .repo-id не совпал"; continue
       fi
@@ -1028,7 +1493,27 @@ while IFS= read -r REPO; do
       fi
     fi
 
-    TITLE="$(build_notes "$SRC" "$VER" "$REPO" "$NOTES_DIR/v$VER.md")"
+    # PIT-018: точка входа в вахту — WATCHLOG §0. Она протухала четыре раза подряд:
+    # версия в шапке поднималась, тело §0 описывало состояние трёх версий назад,
+    # и следующая вахта начинала работу по неверной картине. Ручная дисциплина здесь
+    # не работает по той же причине, что и с картой, — поэтому проверка, а не напоминание.
+    if [ -f "$SRC/WATCHLOG.md" ]; then
+      WLV="$(sed -n 's/.*\*\*Версия:\*\*[[:space:]]*\([0-9][0-9.]*\).*/\1/p' "$SRC/WATCHLOG.md" | head -1)"
+      if [ -z "$WLV" ]; then
+        loud "$REPO v$VER: в WATCHLOG.md нет строки «**Версия:** X.Y.Z» — §0 не читается машиной"
+        note "$REPO|v$VER|watchlog|⚠ §0 без версии"
+      elif [ "$WLV" != "$VER" ]; then
+        loud "$REPO v$VER: WATCHLOG §0 стоит на $WLV — точка входа в вахту отстала. Обнови §0 и перезапусти"
+        note "$REPO|v$VER|watchlog|✗ §0=$WLV ≠ $VER"
+        red "  WATCHLOG §0 = $WLV, публикуется $VER — пропускаю"
+        continue
+      else
+        grn "  ✓ WATCHLOG §0 на версии $VER"
+      fi
+    fi
+
+    TITLE="$(build_notes "$SRC" "$VER" "$REPO" "$NOTES_DIR/v$VER.md")" || TITLE=""
+    TITLE="$(safe_title "$TITLE" "$REPO" "$VER")"
     cyn "  заголовок релиза: $TITLE"
 
     find . -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +   # PIT-004
@@ -1095,8 +1580,10 @@ while IFS= read -r REPO; do
       Z="$(awk -F'\t' -v r="$REPO" -v v="$V" '$1==r && $2==v{print $3; exit}' "$INDEX")"
       release_state "$REPO" "$V"; _st=$?
       if [ "$_st" -eq 2 ]; then
-        red "    ✗ v$V: GitHub недоступен — пропускаю (перезапусти позже)"
-        note "$REPO|v$V|релиз|✗ сеть"
+        red "    ✗ v$V: не смог узнать состояние релиза — пропускаю"
+        [ -n "$RELEASE_STATE_ERR" ] && plain "        ответ gh: $RELEASE_STATE_ERR"
+        cyn "        починка: REPAIR=1 zsh ~/Downloads/deploy.sh"
+        note "$REPO|v$V|релиз|✗ $RELEASE_STATE_ERR"
         continue
       fi
       if [ "$_st" -eq 1 ]; then
@@ -1123,6 +1610,64 @@ while IFS= read -r REPO; do
   grn "ГОТОВО: $REPO —$([ -n "$PUBLISHED" ] && echo "$PUBLISHED" || echo ' актуальна')"
 done < "$REPOLIST"
 
+# --- ШАГ 3.0. СВЕРКА КАРТЫ: идёт ВСЕГДА, а не только при создании новой репы -----
+# За месяц карта отстала на восемь реп, потому что сверка была привязана к событию
+# "создали репу в этом прогоне". Репу можно завести и руками через gh, и тогда
+# она в карту не попадёт никогда. Правило (протокол 07): репа без строки в карте
+# считается незаведённой. Проверяем по факту — списком с GitHub.
+if [ "$HAVE_GH" -eq 1 ] && [ "$DRY" != "1" ]; then
+  _mapfile="$WORK/_mapcheck.md"
+  if git clone -q --depth 1 "$REMOTE_BASE/base-repo.git" "$WORK/_mapchk" 2>/dev/null \
+     && [ -f "$WORK/_mapchk/repos-map.md" ]; then
+    cp "$WORK/_mapchk/repos-map.md" "$_mapfile"
+    gh repo list "$OWNER" --limit 300 --json name,isArchived \
+       --jq '.[] | select(.isArchived==false) | .name' > "$WORK/_ghrepos.txt" 2>/dev/null || : > "$WORK/_ghrepos.txt"
+
+    # PIT-017: прежняя сверка искала `имя` где угодно в файле и потому проходила
+    # на любом упоминании — ссылка в оглавлении, строчка в чужом абзаце. Витринные
+    # зеркала vk-graph / health-report-generator / bron-kerbosch были «в карте»
+    # ровно так: упомянуты, своей секции нет. Считается только оформленная секция
+    # `## \`имя\`` — то есть зона ответственности и границы с соседями.
+    python3 - "$_mapfile" "$WORK/_ghrepos.txt" > "$WORK/_mapverdict.txt" 2>/dev/null <<'PYMAP' || :
+import re, sys
+mp, gl = sys.argv[1], sys.argv[2]
+text = open(mp, encoding="utf-8", errors="replace").read()
+# Заголовок записи выглядит как «## 🧩 `base-repo`  ·  🌐 публичная»: между решёткой
+# и именем стоит эмодзи, после имени — пометки. Выражение обязано это допускать,
+# иначе проверка объявит LOOSE все 54 записи разом и станет бесполезной.
+entries = set(re.findall(r"(?m)^#{2,3}\s+.*?`([A-Za-z0-9._-]+)`", text))
+mentions = set(re.findall(r"`([A-Za-z0-9._-]+)`", text))
+live = [l.strip() for l in open(gl, encoding="utf-8") if l.strip()]
+declared = re.search(r"(\d+)\s*заведено", text)
+missing  = [r for r in live if r not in mentions]
+loose    = [r for r in live if r in mentions and r not in entries]
+stale    = [r for r in sorted(entries) if r not in live]
+if missing: print("MISSING " + " ".join(sorted(missing)))
+if loose:   print("LOOSE "   + " ".join(sorted(loose)))
+if stale:   print("STALE "   + " ".join(stale))
+if declared and int(declared.group(1)) != len(entries):
+    print(f"COUNT в шапке карты {declared.group(1)}, оформленных секций {len(entries)}")
+if not (missing or loose or stale):
+    print(f"OK секций {len(entries)}, реп на GitHub {len(live)}")
+PYMAP
+
+    _verdict="$(cat "$WORK/_mapverdict.txt" 2>/dev/null || true)"
+    _mapclean=1
+    while IFS= read -r _line; do
+      case "$_line" in
+        MISSING*) loud "repos-map: нет в карте вовсе —${_line#MISSING}. Репа без строки в карте считается незаведённой (протокол 07)"; _mapclean=0 ;;
+        LOOSE*)   loud "repos-map: упомянуты, но своей секции нет —${_line#LOOSE}. Упоминание не заменяет описания зоны и границ (протокол 20)"; _mapclean=0 ;;
+        STALE*)   loud "repos-map: секция есть, репы на GitHub нет —${_line#STALE}. Вычисти строку либо верни репу"; _mapclean=0 ;;
+        COUNT*)   loud "repos-map: ${_line#COUNT }"; _mapclean=0 ;;
+        OK*)      grn "✓ repos-map сверена со списком GitHub — ${_line#OK }" ;;
+      esac
+    done <<EOF
+$_verdict
+EOF
+    [ -n "$_verdict" ] || ylw "  сверку карты выполнить не удалось (python3/парсинг) — проверь вручную"
+  fi
+fi
+
 # --- ШАГ 3. repos-map: регистрируем новые репы ------------------------------------
 if [ -n "$NEW_REPOS" ]; then
   echo ""; bld "── Шаг 3. Новые репы → repos-map"
@@ -1135,6 +1680,7 @@ if [ -n "$NEW_REPOS" ]; then
   done
   case "$MAP" in "$WORK"*) MAP="";; esac
   TODAY="$(date +%Y-%m-%d)"
+  MAP_REGISTERED=""   # что реально попало в карту этим прогоном (v4.17.1)
 
   # Локального клона нет — берём base-repo с GitHub сами. Пользователь не должен
   # ничего задавать руками: одна команда должна делать всё до конца.
@@ -1171,15 +1717,29 @@ PYEOF
       [ -f "$CL" ] && printf '\n## %s — авто\n- `%s` — репа создана деплойером, добавлена в карту как **не описанная**.\n' \
         "$TODAY" "$R" >> "$CL"
       note "$R|—|repos-map|добавлена (требует описания)"
+      MAP_REGISTERED="$MAP_REGISTERED $R"
     done
+    # Вердикт сверки собран ДО этого шага — снимаем то, что здесь и починили.
+    map_resolve "$MAP_REGISTERED"
     if [ "$MAP_AUTO" = "1" ]; then
-      if ( cd "$MAP" && git add -A && \
-           git commit -q -m "repos-map: авторегистрация новых реп ($TODAY)" 2>/dev/null && \
-           git push -q origin HEAD 2>/dev/null ); then
+      # Сначала СОСТОЯНИЕ дерева, потом действие. Раньше проверялся код возврата
+      # цепочки add && commit && push: когда все новые репы уже были в карте,
+      # commit падал с "nothing to commit", цепочка рвалась, и скрипт печатал
+      # "push не прошёл" — то есть объявлял успех провалом и мусорил копией
+      # в ~/Downloads. Успех и отсутствие работы это разные вещи, и путать их нельзя.
+      if [ -z "$(cd "$MAP" && git status --porcelain 2>/dev/null)" ]; then
+        grn "✓ repos-map уже актуальна — правок не требуется"
+      elif ! ( cd "$MAP" && git add -A && \
+               git commit -q -m "repos-map: авторегистрация новых реп ($TODAY)" ); then
+        cp "$MAP/repos-map.md" "$HOME/Downloads/repos-map-updated.md" 2>/dev/null
+        red "  ✗ карта правлена, но коммит не удался — копия: ~/Downloads/repos-map-updated.md"
+        note "repos-map|—|карта|✗ коммит"
+      elif ( cd "$MAP" && git push -q origin HEAD 2>/dev/null ); then
         grn "✓ repos-map обновлена и запушена в base-repo — опиши новые репы позже"
       else
         cp "$MAP/repos-map.md" "$HOME/Downloads/repos-map-updated.md" 2>/dev/null
-        ylw "  карта обновлена, но push не прошёл — копия: ~/Downloads/repos-map-updated.md"
+        ylw "  карта закоммичена, но push не прошёл — копия: ~/Downloads/repos-map-updated.md"
+        note "repos-map|—|карта|✗ push"
       fi
     else
       grn "✓ repos-map обновлена: $MAP/repos-map.md — опиши новые репы и закоммить"
@@ -1230,6 +1790,19 @@ if [ "$DELETE_AFTER" = "1" ] && [ "$HAVE_GH" -eq 1 ]; then
   if [ -n "$_kept" ]; then
     echo ""; ylw "  оставлены (на GitHub не всё):"
     printf '%s\n' "$_kept" | sed '/^$/d'
+    # Диагноз без команды починки — половина работы. По умолчанию релизы делаются
+    # только для версий ЭТОГО прогона; тег, уехавший без релиза, сам не починится
+    # никогда, и повторный запуск честно скажет «новых версий нет». Пока команда
+    # не названа здесь, владелец видит проблему и не видит выхода.
+    case "$_kept" in
+      *релиз*)
+        echo ""
+        cyn "  Тег есть, релиза нет — обычным прогоном это не чинится:"
+        cyn "  по умолчанию релизы делаются только для версий текущего прогона."
+        bld "      REPAIR=1 zsh ~/Downloads/deploy.sh"
+        cyn "  (пройдёт по ВСЕМ тегам репы и до-создаст недостающие релизы с ассетами)"
+        ;;
+    esac
   fi
 fi
 

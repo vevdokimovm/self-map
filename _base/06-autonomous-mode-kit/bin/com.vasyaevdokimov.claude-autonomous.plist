@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ШАБЛОН launchd для автономного прогона. `51-autonomous-agent-loop.md` §8.
+
+  ЧТО ДЕЛАТЬ ПЕРЕД ЗАГРУЗКОЙ:
+    1. Заменить <ПУТЬ-К-БРИФУ> на реальный путь заполненного брифа.
+    2. Проверить, что `claude` есть в PATH этого plist (launchd не читает ~/.zshrc):
+       команда `which claude` — и её каталог обязан быть в <key>PATH</key> ниже.
+    3. Скопировать: cp com.vasyaevdokimov.claude-autonomous.plist ~/Library/LaunchAgents/
+    4. Загрузить:  launchctl load ~/Library/LaunchAgents/com.vasyaevdokimov.claude-autonomous.plist
+    5. Выгрузить:  launchctl unload ~/Library/LaunchAgents/com.vasyaevdokimov.claude-autonomous.plist
+
+  ЧТО ЗДЕСЬ ВАЖНО И ЧАСТО ДЕЛАЮТ НЕВЕРНО:
+
+  · KeepAlive/SuccessfulExit=false — перезапускать ТОЛЬКО при ненулевом выходе.
+    Обычный `true` перезапускал бы и после штатного завершения по дедлайну,
+    то есть прогон никогда бы не кончался.
+
+  · launchd поднимает СКРИПТ, а не процесс `claude`. Ретраи внутри одного вызова —
+    дело самого CLI (CLAUDE_CODE_MAX_RETRIES, RETRY_WATCHDOG); переживание падения
+    процесса — дело цикла в скрипте; переживание падения скрипта — дело launchd.
+    Три разных уровня, и каждый чинит только своё.
+
+  · launchd НЕ переживает выключение ноутбука и не будит его. Нужна независимость
+    от машины — это Routines (`51` §7, §9), а не этот файл.
+
+  · Сон ноутбука прерывает прогон. Для длинного автономного окна: `caffeinate -i`
+    вокруг скрипта либо системная настройка «не засыпать при питании от сети».
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.vasyaevdokimov.claude-autonomous</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/vasyaevdokimov/Documents/base-repo/06-autonomous-mode-kit/bin/autonomous_loop.sh</string>
+        <string>--brief</string>
+        <string>&lt;ПУТЬ-К-БРИФУ&gt;</string>
+        <string>--hours</string>
+        <string>168</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>CLAUDE_CODE_MAX_RETRIES</key>
+        <string>15</string>
+        <key>CLAUDE_CODE_RETRY_WATCHDOG</key>
+        <string>1</string>
+        <key>API_TIMEOUT_MS</key>
+        <string>1800000</string>
+    </dict>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/claude-autonomous.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/claude-autonomous.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/vasyaevdokimov/Documents/base-repo</string>
+</dict>
+</plist>

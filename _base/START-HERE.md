@@ -47,16 +47,18 @@
    `00-infrastructure/18-documentation-philosophy.md` (дух: «больше = лучше», слово = триггер на
    `.md`). Система отчётности — `19`–`24` + `reports/README.md`.
 5. Первый этап работы с уже загруженной репой — **ревизия по правилам** (`21-revision-protocol.md`),
-   механику открывает гейт `python3 scripts/revision_check.py` (битые ссылки, `#Uxxxx`, размеры);
+   механику открывает гейт `python3 scripts/revision_check.py` (битые ссылки, `#Uxxxx`, размеры,
+   уровни карточек, числа в прозе); наступил на грабли по ходу — `python3 scripts/capture.py pit "…"`;
    дальше смысловые оси: `06-volume-compression.md` (тяжёлое → `.md`) + `05-knowledge-base-rules.md`
    (дубли/устаревшее/обобщение). Дальше — веди по журналу, changelog и триггерам; отчёты по событиям
    создавай автоматически (`19`, `20`).
-6. Выпуск версий (когда репе нужны релизы): скопируй `templates/publish.sh` в корень, задай `VERSION`
-   (а весь путь «архив от Claude → запушенная репа с тегом и Release» закрывает одна команда
-   `zsh templates/deploy_from_zip.sh <zip>` — `25` §3)
-   и веди `CHANGELOG.md`. Релиз — одной командой: `zsh publish.sh --minor` (или `--patch`/`--major`/
-   `--version X.Y.Z`) → бамп → коммит → тег → пуш → GitHub Release с описанием из `CHANGELOG`. Правила
-   — `00-infrastructure/25-versioning-and-releases.md`.
+6. Выпуск версий (когда репе нужны релизы): подними `VERSION` и допиши секцию в `CHANGELOG.md` в
+   рабочей копии, упакуй по канону `43` (`<repo>-vX.Y.Z.zip`) в `~/Downloads` — весь путь «архив →
+   запушенная репа с тегом и Release» закрывает **одна команда, один скрипт на всю систему**:
+   `zsh ~/Downloads/deploy.sh` (план без изменений — `DRY=1 zsh ~/Downloads/deploy.sh`). Второго
+   скрипта не заводится никогда — новая возможность становится режимом внутри `deploy.sh`, не
+   отдельным файлом (`templates/README.md`). Правила — `00-infrastructure/25-versioning-and-releases.md`,
+   шпаргалка режимов — `templates/deploy-MODES.md`.
 
 ## Карта base-repo
 
@@ -84,7 +86,7 @@
 | `00-infrastructure/17-interview-to-file-methodology.md` | Контекстные файлы/методички через структурированное интервью |
 | `00-infrastructure/18-documentation-philosophy.md` | **Философия документирования: «больше = лучше», слово = триггер, теория в доках, 4 аккаунта** |
 | `00-infrastructure/19-reporting-system.md` | Диспетчер отчётов: триггер → тип → шаблон → папка → реестр |
-| `00-infrastructure/20-knowledge-capture-protocol.md` | Автофиксация знаний по 7 триггерам (T1–T7) |
+| `00-infrastructure/20-knowledge-capture-protocol.md` | Фиксация знаний по 8 триггерам (T1–T8); заведение — `python3 scripts/capture.py` |
 | `00-infrastructure/21-revision-protocol.md` | Ревизия всего в репе: живое vs замороженное, оси |
 | `00-infrastructure/22-merge-protocol.md` | Слияние/форк линий между аккаунтами |
 | `00-infrastructure/23-session-continuity.md` | Чекпоинт-дисциплина + несколько аккаунтов |
@@ -97,17 +99,31 @@
 | `00-infrastructure/31-media-and-photo-storage.md` | Фото/видео вне git: 3-2-1, диск + копия, каталог в репе |
 | `00-infrastructure/32-git-hooks-and-secret-scanning.md` | Хук против секретов и тяжёлых файлов; что делать при утечке токена |
 | `00-infrastructure/33-token-budget-and-modes.md` | Бюджет токенов и режимы чтения A–E (замерено, не из документации) |
+| `00-infrastructure/53-infrastructure-sync-standard.md` | Правило-указатель на кит синтеза инфраструктур |
+| `00-infrastructure/54-pdf-reading-channels.md` | Как читаются PDF и картинки: три канала доставки, что с чем происходит |
+| `00-infrastructure/55-pdf-channels-experiment.md` | Замер трёх каналов на одном документе: где качество выше |
+| `00-infrastructure/56-chat-to-project-to-repo.md` | Жизненный цикл: чат → пет-проект → репа → блок основной репы |
+| `00-infrastructure/57-self-sufficiency-rule.md` | Правило самодостаточности: архив/репа содержит ВСЁ |
+| `00-infrastructure/58-git-practice.md` | Git: как устроен и как им работать (модель важнее команд) |
+| `00-infrastructure/59-public-mirror-filter.md` | Фильтр публичных реп: приватный канон → публичное зеркало |
+| `00-infrastructure/60-audio-video-pipeline.md` | Аудио/видео → текст и кадры: препроцессор для того, что Claude не слышит |
+| `00-infrastructure/61-token-analytics.md` | Токен-аналитика: сколько контекста съедено и как это увидеть |
+| `00-infrastructure/62-vim.md` | Vim: модель, минимум для работы, план освоения |
+| `00-infrastructure/63-ai-tools-landscape.md` | Карта ИИ-инструментов под задачу; где потолок каждого |
+| `00-infrastructure/64-claude-code-sandbox.md` | Локальная песочница для Claude Code — не переустанавливать каждый раз |
+| `05-infra-synthesis-lab/` | **Кит синтеза инфраструктур:** стандарт, чек-лист, грабли, журналы прогонов |
 | `00-CLAUDE-STOP.md` | 🔴 **Вход для Claude:** обрыв канала tool-call + секреты. Читать первым |
 | `.githooks/pre-commit` | Хук: не пускает в коммит секреты, тяжёлые бинарники, `.zip`/`.docx` |
 | `01-claude-context/` | **Единый кит контекста** для всех аккаунтов Claude (вход — `00-navigator.md`) |
 | `reports/README.md` | **Дом системы отчётности** — шаблоны, гайды, реестры, папки по типам (+ рубрика `situations/`, эксперименты `experiments/`) |
 | `templates/REPO_README_TEMPLATE.md` | Шаблон корневого README репы |
+| `templates/START-HERE_TEMPLATE.md` | Шаблон входа в репу (класс, состояние, порядок входа) |
 | `templates/gitignore.template` | Базовый `.gitignore` |
 | `templates/CHANGELOG_TEMPLATE.md` | Шаблон подробного `CHANGELOG` |
-| `templates/publish.sh` | Скрипт автопуша версии (bump → commit → tag → push → GitHub Release) |
-| `templates/deploy_from_zip.sh` | Архив от Claude → клон → чистая замена дерева → push (+ тег и Release) |
-| `templates/deploy_all.sh` | **Все репы одной командой**: прогон `deploy_from_zip.sh` по папке архивов |
-| `VERSION` | Текущая версия репы (источник правды для `publish.sh`) |
+| `templates/ROADMAP_TEMPLATE.md` | Шаблон дорожной карты (P1/P2/P3 + «что НЕ делаем») |
+| `templates/TASKS_TEMPLATE.md` | Шаблон задач владельца вне песочницы |
+| `templates/deploy.sh` | **Единый деплойер всей системы** (второго скрипта не заводится никогда): архив из `~/Downloads` → клон → чистая замена дерева → коммит → тег → push → GitHub Release с каноническим ассетом. Режимы — `templates/deploy-MODES.md` |
+| `VERSION` | Текущая версия репы (источник правды для `deploy.sh`) |
 
 ## Отличие от FINPILOT
 

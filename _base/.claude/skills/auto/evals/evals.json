@@ -1,0 +1,22 @@
+{
+  "skill": "auto",
+  "runs_per_case": 3,
+  "note": "Негативы обязательны: скилл, срабатывающий всегда, так же плох, как не срабатывающий никогда. Типовой разрыв — в описании: оно объясняет WHAT вместо WHEN (37-skills-system.md §4а). Граница здесь тонкая: 'работай' и 'продолжай' — обычная работа, а не авто-режим; триггер — уход владельца или явный отказ от вопросов.",
+  "cases": [
+    { "prompt": "запусти авто режим", "should_trigger": true },
+    { "prompt": "я ухожу, продолжай без меня", "should_trigger": true },
+    { "prompt": "я спать, работай до конца лимита", "should_trigger": true },
+    { "prompt": "закрою ноут, но ты работай", "should_trigger": true },
+    { "prompt": "не спрашивай ничего, просто делай", "should_trigger": true },
+    { "prompt": "работай сам, я вернусь утром", "should_trigger": true },
+    { "prompt": "оставлю мак открытым, продолжай пока не кончится лимит", "should_trigger": true },
+    { "prompt": "продолжай", "should_trigger": false },
+    { "prompt": "продолжай кампанию синтеза", "should_trigger": false },
+    { "prompt": "работай дальше по роадмапу", "should_trigger": false },
+    { "prompt": "закрой батч и подними версию", "should_trigger": false },
+    { "prompt": "поставь будильник на час", "should_trigger": false },
+    { "prompt": "что дальше по плану", "should_trigger": false },
+    { "prompt": "я тут, рядом сижу, показывай что делаешь", "should_trigger": false },
+    { "prompt": "сделай ресёрч по токенам", "should_trigger": false }
+  ]
+}

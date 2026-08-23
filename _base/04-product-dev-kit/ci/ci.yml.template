@@ -1,0 +1,90 @@
+# Скопировать в .github/workflows/ci.yml. Три тира соответствуют STANDARD.md §2.
+# Команды — под Python/FastAPI-стек по умолчанию; для другого стека замени шаги внутри
+# jobs, структуру (preflight → fast блокирует → full/deep по тегу/расписанию) сохрани.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+  schedule:
+    - cron: "0 3 * * 1"  # deep — раз в неделю, понедельник
+  workflow_dispatch:
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Версионная церемония (VERSION == CHANGELOG top)
+        run: make preflight
+
+  fast:
+    needs: preflight
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        db: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: fast-тир (unit+integration+property+e2e-smoke) + coverage-гейт
+        run: pytest -m fast --cov=app --cov-fail-under=90
+      - name: Линтеры — информационно, не блокирует (см. STANDARD.md §2)
+        run: |
+          flake8 . || true
+          mypy . || true
+        continue-on-error: true
+
+  full:
+    needs: fast
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: full-тир (мультибраузер E2E, визуальная регрессия, live-a11y)
+        run: pytest -m full
+      - name: security-сканы (bandit/pip-audit — заменить на актуальные под стек)
+        run: |
+          pip install bandit pip-audit
+          bandit -r app -ll
+          pip-audit
+      - name: нагрузочный smoke
+        run: echo "locust/аналог — подключить под реальный сценарий"
+
+  deep:
+    needs: preflight
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: deep-тир (стресс property-тесты, mutation-testing)
+        run: pytest -m deep

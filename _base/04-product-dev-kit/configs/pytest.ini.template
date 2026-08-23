@@ -1,0 +1,13 @@
+[pytest]
+markers =
+    fast: юнит + интеграционные + property-based + e2e-smoke — гоняются на каждый push/PR
+    full: мультибраузер E2E, визуальная регрессия, live-a11y, security-сканы — на тегах релиза
+    deep: стресс property-тесты, mutation-testing — по расписанию, редко
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts = --strict-markers -ra
+
+# Три маркера = три тира CI (STANDARD.md §2). Тест без маркера по умолчанию не входит ни в один
+# тир — это осознанный отказ (namespace для «пока не решил, куда»), не баг конфига.
