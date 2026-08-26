@@ -84,7 +84,7 @@
 | `00-infrastructure/15-gotchas-claude-git.md` | Сквозные грабли Claude+Git, приватность, мультиаккаунт |
 | `00-infrastructure/16-limits-empirical-estimate.md` | Эмпирическая оценка лимитов Claude (живая гипотеза) |
 | `00-infrastructure/17-interview-to-file-methodology.md` | Контекстные файлы/методички через структурированное интервью |
-| `00-infrastructure/18-documentation-philosophy.md` | **Философия документирования: «больше = лучше», слово = триггер, теория в доках, 4 аккаунта** |
+| `00-infrastructure/18-documentation-philosophy.md` | **Философия документирования: «больше = лучше», слово = триггер, теория в доках, 5 аккаунтов** |
 | `00-infrastructure/19-reporting-system.md` | Диспетчер отчётов: триггер → тип → шаблон → папка → реестр |
 | `00-infrastructure/20-knowledge-capture-protocol.md` | Фиксация знаний по 8 триггерам (T1–T8); заведение — `python3 scripts/capture.py` |
 | `00-infrastructure/21-revision-protocol.md` | Ревизия всего в репе: живое vs замороженное, оси |

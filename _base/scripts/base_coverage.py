@@ -139,8 +139,18 @@ def check_adr004() -> int:
                 no_stamp.append(d.name)
             else:
                 v = stamp.read_text(encoding="utf-8").strip()
-                if v != base_ver:
-                    stale_stamp.append((d.name, v))
+                # 🔴 Порог, а не равенство — `ADR-004` §5 правило 1 так и предписывал.
+                # Строгое сравнение делало метрику вечно красной: база проходит
+                # по несколько минорных версий за сессию, и все зеркала становились
+                # «отставшими» после каждого батча (измерено 22.08.2026).
+                try:
+                    mv = [int(x) for x in v.split(".")[:2]]
+                    cv = [int(x) for x in base_ver.split(".")[:2]]
+                    lag = 999 if mv[0] != cv[0] else cv[1] - mv[1]
+                except ValueError:
+                    lag = 999
+                if lag > 5:
+                    stale_stamp.append((d.name, f"{v} (−{lag})"))
 
         # --- Правило 2: копии канона в своей инфраструктуре
         own = d / "00-infrastructure"

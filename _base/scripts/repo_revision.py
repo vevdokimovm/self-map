@@ -74,6 +74,31 @@ def looks_like_path(s: str) -> bool:
     return bool(re.match(r"^[\w.\-]+\.(md|py|sh|json|yml|yaml|txt|csv|html|toml|cfg)$", s))
 
 
+def stamp_lag(mirror: str, canon: str) -> int | None:
+    """На сколько МИНОРНЫХ версий отстало зеркало. None — если не сравнить.
+
+    🔴 ПОЧЕМУ ПОРОГ, А НЕ СТРОГОЕ РАВЕНСТВО. `ADR-004` §5 правило 1 предписывал
+    краснеть «при расхождении больше N минорных версий»; первая реализация сравнивала
+    строки на равенство. Следствие измерено 22.08.2026: база прошла за сессию
+    12 версий, и после КАЖДОГО батча все 51 зеркало становились «отставшими».
+    Метрика, которая всегда красная, не отличает норму от дефекта — и перестаёт
+    читаться, как перестал читаться реестр из `PIT-116`.
+
+    Порог 5 минорных: раздача повторяется раз в несколько батчей, а не после каждого.
+    Разная МАЖОРНАЯ версия — отставание всегда, сколько бы ни было миноров.
+    """
+    try:
+        m = [int(x) for x in mirror.split(".")[:2]]
+        c = [int(x) for x in canon.split(".")[:2]]
+    except ValueError:
+        return None
+    if m[0] != c[0]:
+        return 999
+    return c[1] - m[1]
+
+
+LAG_THRESHOLD = 5
+
 def dead_paths(repo: Path, doc: Path) -> list[str]:
     """Пути из документа, которых нет на диске.
 
@@ -94,6 +119,22 @@ def dead_paths(repo: Path, doc: Path) -> list[str]:
             continue
         if (repo / rel).exists() or (doc.parent / rel).exists():
             continue
+        # 🔴 Путь может быть ВЛОЖЕННЫМ: README пишет `invitro/`, а на диске это
+        # `01-lab-tests/invitro/`. Проверка только от корня объявляла такие пути
+        # мёртвыми — 21 ложное срабатывание в `health-vault` сразу после того,
+        # как его README был приведён к диску (найдено 22.08.2026).
+        # Ищем последний сегмент по всему дереву репы.
+        tail = rel.split("/")[-1]
+        if tail and any(True for _ in repo.rglob(tail)):
+            continue
+        # 🔴 Ссылка-указатель по НОМЕРУ файла: `01-libraries/idite-lesom/06`
+        # адресует `06-obzor….md`, а не каталог `06`. В системе документы
+        # нумерованы, и ссылаться на номер — штатная нотация (найдено 22.08.2026
+        # в `legal-knowledge-base`: 14 таких ссылок).
+        if tail.isdigit():
+            parent = repo / "/".join(rel.split("/")[:-1])
+            if parent.is_dir() and any(f.name.startswith(tail + "-") for f in parent.iterdir()):
+                continue
         # Путь мог быть указан в чужую репу или в базу — это не дефект README
         if (REPOS / rel).exists() or (BASE / rel).exists():
             continue
@@ -101,6 +142,12 @@ def dead_paths(repo: Path, doc: Path) -> list[str]:
         # на диске. Форма совпадает с относительным путём полностью, различить
         # можно только по владельцу (найдено 22.08.2026 на выборке).
         if rel.startswith("vevdokimovm/"):
+            continue
+        # Путь вида `base-repo/00-infrastructure/83-…` адресует КАНОН и пишется
+        # от корня системы. Проверять его внутри самой базы бессмысленно —
+        # получится `base-repo/base-repo/…`. Найдено 22.08.2026: документ
+        # существовал, а проверка объявляла ссылку мёртвой.
+        if rel.startswith("base-repo/") and (BASE.parent / rel).exists():
             continue
         dead.append(raw)
     return dead
@@ -126,7 +173,10 @@ def check(repo: Path, canon_ver: str) -> dict:
     if readme.is_file():
         res["dead"] = dead_paths(repo, readme)
         said = stated_count(readme)
-        if said is not None:
+        # Уточнённое число («всего в тематических разделах») не сверяется с общим
+        # пересчётом — это разные величины, и расхождение здесь не дефект.
+        if said is not None and "тематическ" not in readme.read_text(
+                encoding="utf-8", errors="replace")[:4000]:
             got = real_count(repo)
             # ±5 % — проза округляет; расхождение в разы это не прячет
             if abs(said - got) > max(5, got * 0.05):
@@ -134,9 +184,34 @@ def check(repo: Path, canon_ver: str) -> dict:
     stamp = repo / "_base" / "BASE_VERSION"
     if stamp.is_file():
         v = stamp.read_text(encoding="utf-8").strip()
-        if v != canon_ver:
-            res["stamp"] = v
+        lag = stamp_lag(v, canon_ver)
+        if lag is not None and lag > LAG_THRESHOLD:
+            res["stamp"] = f"{v} (отстаёт на {lag} минорных)"
     return res
+
+
+def check_classes() -> list[str]:
+    """Все значения `.repo-class` обязаны быть описаны в `76-repo-classes.md`.
+
+    🔴 Найдено 22.08.2026: класс `profile` **использовался** (`vevdokimovm`) и при этом
+    отсутствовал в документе, объявленном единственным источником правды по классам.
+    Поймано не чтением, а сверкой множеств — глазами такое не видно, потому что
+    и файл, и документ выглядят исправными по отдельности.
+
+    Класс дефекта тот же, что у реестров (`PIT-098`), но отстаёт здесь не список
+    записей, а **список допустимых значений**.
+    """
+    doc = BASE / "00-infrastructure" / "76-repo-classes.md"
+    if not doc.is_file():
+        return []
+    known = set(re.findall(r"^\|\s*\*\*([a-z-]+)\*\*", doc.read_text(encoding="utf-8"), re.M))
+    used = {}
+    for d in REPOS.iterdir():
+        f = d / ".repo-class"
+        if d.is_dir() and f.is_file():
+            used.setdefault(f.read_text(encoding="utf-8").strip().split(":")[0], []).append(d.name)
+    return [f"класс `{c}` используется ({', '.join(v[:3])}), но не описан в 76-repo-classes.md"
+            for c, v in sorted(used.items()) if c and c not in known]
 
 
 def main() -> int:
@@ -174,6 +249,9 @@ def main() -> int:
         if a.verbose and r["dead"]:
             for p in r["dead"][:12]:
                 print(f"      ✗ {p}")
+
+    for line in check_classes():
+        print(f"\n  🔴 {line}")
 
     print(f"\n  реп с расхождениями: {len(rows)} из {len(targets)}")
     print(f"  мёртвых путей всего: {bad_paths}")

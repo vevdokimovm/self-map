@@ -6,7 +6,8 @@
 #
 # Что делает сверх autonomous_loop.sh — то, что иначе владелец делает руками
 # и однажды забудет:
-#   · берёт бриф из ~/Downloads/NIGHT-RUN-BRIEF.md, если не указан другой;
+#   · берёт бриф из 06-autonomous-mode-kit/runs/NIGHT-RUN-BRIEF.md, если не указан другой
+#     (мандат живёт внутри репы, не в Downloads — исправлено 25.08.2026);
 #   · оборачивает прогон в `caffeinate -i` — иначе ноутбук уснёт и прогон умрёт
 #     на первой же паузе, а утром это выглядит как «агент ничего не сделал»;
 #   · отвязывает от терминала (`nohup`) — закрытие окна больше не убивает прогон;
@@ -18,7 +19,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BRIEF="${1:-$HOME/Downloads/NIGHT-RUN-BRIEF.md}"
+BRIEF="${1:-$(dirname "$0")/../runs/NIGHT-RUN-BRIEF.md}"
 HOURS="${2:-9}"
 
 c(){ printf '\033[96m%s\033[0m\n' "$*"; }

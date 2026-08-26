@@ -159,7 +159,8 @@ bash 06-autonomous-mode-kit/bin/night.sh ~/Downloads/NIGHT-RUN-BRIEF.md 9
 ! ~/Documents/base-repo/06-autonomous-mode-kit/bin/night.sh
 ```
 
-Бриф берётся из `~/Downloads/NIGHT-RUN-BRIEF.md` по умолчанию, часов — 9,
+🔴 **Исправлено 25.08.2026:** бриф берётся из `06-autonomous-mode-kit/runs/NIGHT-RUN-BRIEF.md`
+по умолчанию (не из `~/Downloads` — мандат живёт внутри репы), часов — 9,
 `caffeinate -i` внутри. Мягкая остановка — `touch <RUN_DIR>/STOP`.
 
 **Родня:** PIT-015 (в авто-режиме операция режется режимом разрешений — проверять режим

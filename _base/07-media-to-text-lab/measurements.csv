@@ -1,0 +1,5 @@
+date,run,source_type,files_before,mb_before,files_after,mb_after,text_extracted,loss_named,reversible,tool
+2026-08-22,telegram-mozg-psikhologiya,telegram-html-export,2799,125.0,4,1.67,"1425 сообщений из 2799 (904 только вложение)","1808 фото 119МБ + 87 стикеров + 8 видео + 3.7МБ html",yes,tools/tg_export_to_md.py
+2026-08-22,epstein-files-dataset,pdf-dataset,33382,100.0,1,0.01,"опись по 12 партиям, текст не извлекался","весь датасет: 31841 pdf + 909 html + 615 mp4",yes,вручную
+2026-08-22,health-vault-pdf,medical-scans,269,,0,,"не начат — эталоны остаются, выжимки не сделаны","—",no,🔲 нужен PDF→md
+2026-08-23,docs-to-md-system,"pdf/docx/pptx/xlsx",5236,,543,,"360 за прогон, 76525 знаков с 77 страниц","40 сканов без текстового слоя (нужен OCR), заглушки iCloud пропущены",yes,tools/docs_to_md.py

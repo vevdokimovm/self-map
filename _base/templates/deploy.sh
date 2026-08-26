@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# deploy.sh v4.17.2 — ЕДИНЫЙ деплойер репозиториев. Один скрипт на всю систему.
+# deploy.sh v4.20.1 — ЕДИНЫЙ деплойер репозиториев. Один скрипт на всю систему.
 #
 # ┌───────────────────────────────────────────────────────────────────────────┐
 # │ ЖЕЛЕЗНОЕ ПРАВИЛО: ВТОРОГО СКРИПТА НЕ ЗАВОДИТСЯ. НИКОГДА.                   │
@@ -97,7 +97,7 @@ REMOTE_BASE="${REMOTE_BASE:-https://github.com/$OWNER}"   # переопреде
 MIN_FILES="${MIN_FILES:-5}"
 PRIVATE="${PRIVATE:-1}"
 ASSET="${ASSET:-1}"
-SCRIPT_VERSION="4.17.2"
+SCRIPT_VERSION="4.20.1"
 # Накопители по релизам. Объявлены здесь, а не в блоке 2Б: ветка REPAIR (шаг 2А)
 # вызывает ensure_release раньше, и под `set -u` обращение к необъявленной ASSET_OK
 # роняло весь прогон уже ПОСЛЕ создания релиза — работа сделана, а код возврата ошибка.
@@ -238,8 +238,29 @@ safe_title(){
 }
 die(){ red "ОШИБКА: $*"; [ -n "${WORK:-}" ] && [ -d "${WORK:-}" ] && red "Рабочая папка сохранена: $WORK"; exit 1; }
 
+# 🔴 ДЕТЕРМИНИРОВАННЫЙ ОТКАЗ НЕ РЕТРАИТСЯ. Найдено владельцем 22.08.2026.
+# `git push` в edu-base отклонялся `pre-receive` хуком: файл 207.75 МБ при жёстком
+# лимите GitHub 100 МБ. Ретрай счёл это сетевым сбоем и повторил ПЯТЬ раз, каждый раз
+# заливая 549 МБ по ~1.5 МБ/с — около получаса впустую. Отказ был окончательным:
+# он не прошёл бы никогда, сколько ни жди.
+#
+# Ретрай осмыслен только для ВРЕМЕННОГО отказа (сеть, таймаут, 5xx). Отказ по
+# содержанию — лимит размера, отклонение хуком, отсутствие прав — повторять нельзя:
+# ожидание ничего не меняет, а стоит времени и трафика.
+FATAL_PATTERNS='GH001|exceeds GitHub.s file size limit|pre-receive hook declined|Large files detected|remote rejected|Permission denied|403 Forbidden|authentication failed|repository not found'
+
 retry(){ d="$1"; shift; a=1; s="$RETRY_SLEEP"
-  while [ "$a" -le "$RETRIES" ]; do "$@" && return 0
+  while [ "$a" -le "$RETRIES" ]; do
+    _out="$("$@" 2>&1)"; _rc=$?
+    printf '%s\n' "$_out"
+    [ "$_rc" -eq 0 ] && return 0
+    if printf '%s' "$_out" | grep -qE "$FATAL_PATTERNS"; then
+      red "  ✗ $d — отказ ОКОНЧАТЕЛЬНЫЙ, ретрай не поможет:"
+      printf '%s' "$_out" | grep -oE "$FATAL_PATTERNS" | sort -u | sed 's/^/      /'
+      red "  Причина в содержании, а не в сети. Чинить, а не ждать."
+      red "  Файлы >100 МБ: python3 base-repo/07-media-to-text-lab/tools/heavy_media_to_note.py --all"
+      return 1
+    fi
     ylw "  попытка $a/$RETRIES ($d) не удалась — жду ${s}s (обычно TLS-таймаут к GitHub)"
     sleep "$s"; a=$((a+1)); s=$((s*2)); done; return 1; }
 
@@ -921,11 +942,18 @@ if [ -n "$_free_mb" ] && [ "$_free_mb" -lt "$MIN_FREE_MB" ]; then
      Порог меняется через MIN_FREE_MB."
 fi
 bld "── deploy.sh v$SCRIPT_VERSION · Шаг 1. Ищу версионные архивы в $DIR"
+# 🔴 Прогресс обязателен: шаг молча читает каждый архив, и на полусотне это десятки
+# секунд. Молчание неотличимо от зависания — владелец прерывал прогон дважды.
+_ntotal="$(ls -1 "$DIR"/*.zip 2>/dev/null | wc -l | tr -d " ")"
+[ "${_ntotal:-0}" -gt 0 ] && ylw "   архивов к разбору: $_ntotal"
+_nseen=0
 INDEX="$(mktemp)"
 NONCANON=""; DUPES=""; VARIANTS=""; MAPPED=""; UNKNOWN=""; N_SERVICE=0
 for z in "$DIR"/*.zip; do
   [ -f "$z" ] || continue
   base="$(basename "$z" .zip)"
+  _nseen=$((_nseen+1))
+  printf '\r   [%s/%s] %-46.46s' "$_nseen" "${_ntotal:-?}" "$base" >&2
 
   # (A) служебные архивы из чата (files 3.zip, 16.zip) — не наши артефакты, молча мимо
   if printf '%s' "$base" | LC_ALL=C grep -qE "$SERVICE_RE"; then
@@ -1001,13 +1029,22 @@ for z in "$DIR"/*.zip; do
     done
   fi
 
-  # ПРЕДПОЛЁТНАЯ ПРОВЕРКА (дёшево — по списку файлов, без распаковки).
-  # Делается ДО создания репы: иначе битый архив успевал породить на GitHub пустую
-  # репу-сироту, которую потом руками удалять. Поймано тестом 21.
-  if ! unzip -t "$z" >/dev/null 2>&1; then
+  # ПРЕДПОЛЁТНАЯ ПРОВЕРКА целостности. Делается ДО создания репы: иначе битый архив
+  # успевал породить на GitHub пустую репу-сироту, которую потом удалять руками.
+  #
+  # 🔴 РАНЬШЕ ЗДЕСЬ СТОЯЛ `unzip -t`, и комментарий утверждал «дёшево, без распаковки».
+  # Утверждение было неверным: `-t` проверяет CRC КАЖДОГО файла, то есть распаковывает
+  # весь архив в память. Замер 23.08.2026: 3.8 с на архив в 268 МБ, **47 секунд молча**
+  # на 47 архивах — владелец видел «скрипт стоит на Шаге 1» и дважды прерывал прогон.
+  #
+  # `zipinfo -1` читает только центральную директорию — она дописывается ПОСЛЕДНЕЙ,
+  # поэтому её наличие и есть признак дописанного архива (`PIT-130`). Это то, что
+  # проверка и должна была делать: отличить оборванный файл от целого, а не
+  # пересчитать CRC.
+  if ! zipinfo -1 "$z" >/dev/null 2>&1; then
     sleep 3
-    if ! unzip -t "$z" >/dev/null 2>&1; then
-      red "  ✗ $base.zip — битый архив (не читается), пропускаю"; continue
+    if ! zipinfo -1 "$z" >/dev/null 2>&1; then
+      red "  ✗ $base.zip — битый архив (нет оглавления), пропускаю"; continue
     fi
     ylw "  ~ $base.zip — дочитался со второй попытки (файл ещё писался)"
   fi
@@ -1551,6 +1588,16 @@ while IFS= read -r REPO; do
 
   # --- 2C. Push. Даже если релизы упадут — дерево и теги уже на месте ------------
   if [ -n "$PUBLISHED" ]; then
+    # 🔴 Проверка размеров ДО push. Дешевле узнать о лимите здесь, чем после
+    # заливки 549 МБ и отказа `pre-receive` (22.08.2026, edu-base).
+    _big="$(find . -type f -size +100M -not -path './.git/*' 2>/dev/null | head -5)"
+    if [ -n "$_big" ]; then
+      red "  ✗ файлы тяжелее 100 МБ — GitHub отклонит push (GH001):"
+      printf '%s\n' "$_big" | sed 's|^\./|      |'
+      red "  Свернуть в служебки: python3 base-repo/07-media-to-text-lab/tools/heavy_media_to_note.py --repo $REPO --apply"
+      note "$REPO|$VER|push|ОТКАЗ: файлы >100МБ"
+      continue
+    fi
     echo ""; ylw "→ пушу ветку и теги"
     pushb(){ git push -u origin "$BRANCH"; }
     pusht(){ git push origin --tags; }
@@ -1616,10 +1663,17 @@ done < "$REPOLIST"
 # она в карту не попадёт никогда. Правило (протокол 07): репа без строки в карте
 # считается незаведённой. Проверяем по факту — списком с GitHub.
 if [ "$HAVE_GH" -eq 1 ] && [ "$DRY" != "1" ]; then
+  # 🔴 Каждый шаг сверки отчитывается ЗА СЕБЯ (`PIT-137`). Прежде здесь стоял общий
+  # `2>/dev/null || :`, и любой отказ — не склонировалось, файла нет, python упал —
+  # выглядел одинаково: «сверку карты выполнить не удалось (python3/парсинг)».
+  # Сообщение называло виновником python, который при живом файле отрабатывает.
   _mapfile="$WORK/_mapcheck.md"
+  _mapstage="клон base-repo"
   if git clone -q --depth 1 "$REMOTE_BASE/base-repo.git" "$WORK/_mapchk" 2>/dev/null \
      && [ -f "$WORK/_mapchk/repos-map.md" ]; then
+    _mapstage="копирование repos-map.md"
     cp "$WORK/_mapchk/repos-map.md" "$_mapfile"
+    _mapstage="разбор карты"
     gh repo list "$OWNER" --limit 300 --json name,isArchived \
        --jq '.[] | select(.isArchived==false) | .name' > "$WORK/_ghrepos.txt" 2>/dev/null || : > "$WORK/_ghrepos.txt"
 
@@ -1655,7 +1709,7 @@ PYMAP
     _mapclean=1
     while IFS= read -r _line; do
       case "$_line" in
-        MISSING*) loud "repos-map: нет в карте вовсе —${_line#MISSING}. Репа без строки в карте считается незаведённой (протокол 07)"; _mapclean=0 ;;
+        MISSING*) loud "repos-map: нет в карте вовсе —${_line#MISSING}. Шаг 3 добавит строку-заглушку автоматически — от тебя нужно только дописать содержательное описание зоны ответственности (протокол 07)"; _mapclean=0 ;;
         LOOSE*)   loud "repos-map: упомянуты, но своей секции нет —${_line#LOOSE}. Упоминание не заменяет описания зоны и границ (протокол 20)"; _mapclean=0 ;;
         STALE*)   loud "repos-map: секция есть, репы на GitHub нет —${_line#STALE}. Вычисти строку либо верни репу"; _mapclean=0 ;;
         COUNT*)   loud "repos-map: ${_line#COUNT }"; _mapclean=0 ;;
@@ -1664,7 +1718,7 @@ PYMAP
     done <<EOF
 $_verdict
 EOF
-    [ -n "$_verdict" ] || ylw "  сверку карты выполнить не удалось (python3/парсинг) — проверь вручную"
+    [ -n "$_verdict" ] || ylw "  сверку карты выполнить не удалось на шаге: $_mapstage — проверь вручную"
   fi
 fi
 

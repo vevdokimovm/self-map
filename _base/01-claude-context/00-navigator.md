@@ -1,6 +1,21 @@
 # 📁 Единый кит контекста — Василий Евдокимов
 
-> Всё сведено в одну структуру. Актуально: июль 2026. Как разворачивать — см. `how-to-use.md`.
+> Всё сведено в одну структуру. **Актуально: 23.08.2026.** Как разворачивать — `how-to-use.md`.
+>
+> 🆕 **Вахт пять** — V Vasilii · S Sergey · J Jesus · M Michael · **A Adam** (23.08.2026).
+> Контекст **не синкается между аккаунтами**: Preferences, Memory, Project Knowledge
+> и Cowork заливаются в каждый руками. Чек-лист заведения новой вахты —
+> `00-infrastructure/27-claude-memory-and-instructions.md` §8.5.
+>
+> **Три разные поверхности, три разных файла:**
+>
+> | Куда | Что заливать |
+> |---|---|
+> | claude.ai → Настройки → Профиль → **Preferences** | `00-core/context-preferences-edition.md` |
+> | claude.ai → Settings → **Memory** | `00-core/memory-all-accounts.md` |
+> | Настройки → **Cowork** → Global instructions | `00-core/cowork-global-instructions.md` |
+>
+> Cowork **не видит** Preferences и Project Knowledge — его файл самодостаточен.
 
 ---
 
