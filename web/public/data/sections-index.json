@@ -1,0 +1,1001 @@
+[
+  {
+    "dir": "01-psychological-profile",
+    "title": "Психологический профиль",
+    "desc": "Профиль, тень, подличности (IFS), портрет",
+    "fileCount": 23,
+    "entries": [
+      {
+        "name": "kak-otpustit-styd-proshlogo-i-provalov.md",
+        "kind": "file"
+      },
+      {
+        "name": "korni-zhazhdy-k-samopoznaniyu.md",
+        "kind": "file"
+      },
+      {
+        "name": "mne-byvaet-bolno.md",
+        "kind": "file"
+      },
+      {
+        "name": "psikhologicheskiy-portret.md",
+        "kind": "file"
+      },
+      {
+        "name": "ten.md",
+        "kind": "file"
+      },
+      {
+        "name": "terapevticheskaya-karta.md",
+        "kind": "file"
+      },
+      {
+        "name": "ya-i-podlichnosti-ifs.md",
+        "kind": "file"
+      },
+      {
+        "name": "Мой портрет (текущая точка 06.05.2026).docx",
+        "kind": "file"
+      },
+      {
+        "name": "Мой портрет (текущая точка 06.05.2026).docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет (полный, прошлое).docx",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет (полный, прошлое).docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов__imp.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов__imp.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов_ФИНАЛ.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов_ФИНАЛ.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов_ФИНАЛ__imp.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов_ФИНАЛ__imp.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов_промежуточный.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Портрет_Василий_Евдокимов_промежуточный.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Психологический портрет.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Психологический портрет.docx.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "02-clinical",
+    "title": "Клиническое",
+    "desc": "Терапевтическая карта, MMPI, «Мне бывает больно»",
+    "fileCount": 31,
+    "entries": [
+      {
+        "name": "2026-05-29-shkala-depressii-beka.md",
+        "kind": "file"
+      },
+      {
+        "name": "evdokimov-vasiliy-maksimovich-2.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "evdokimov-vasiliy-maksimovich-2.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "evdokimov-vasiliy-maksimovich.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "evdokimov-vasiliy-maksimovich.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "evdokimov-vasiliy.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "evdokimov-vasiliy.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "mmpi-20-04-26.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "mmpi-20-04-26.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "psychologist-sessions",
+        "kind": "dir",
+        "count": 18
+      },
+      {
+        "name": "Мне бывает больно.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Мне бывает больно.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "терапевтическая карта.docx",
+        "kind": "file"
+      },
+      {
+        "name": "терапевтическая карта.docx.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "03-competency-reports-rsv",
+    "title": "Компетентностные отчёты",
+    "desc": "Отчёты РЦВ: ценности, жизнестойкость, клиентоориентированность",
+    "fileCount": 14,
+    "entries": [
+      {
+        "name": "klientoorientirovannost.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "klientoorientirovannost.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "motivatsionno-tsennostnyy-profil.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "motivatsionno-tsennostnyy-profil.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "otsenka-v-ramkakh-proekta-tsentry-kompetentsiy.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "otsenka-v-ramkakh-proekta-tsentry-kompetentsiy.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "passivnyy-slovarnyy-zapas.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "passivnyy-slovarnyy-zapas.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "tsennostnye-ustanovki-liderstva.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "tsennostnye-ustanovki-liderstva.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "universalnyy-lichnostnyy-oprosnik.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "universalnyy-lichnostnyy-oprosnik.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "zhiznestoykost.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "zhiznestoykost.pdf.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "04-genetics-genotek",
+    "title": "Генетика (личность)",
+    "desc": "Генетика в части личности — не медицина (см. health-vault)",
+    "fileCount": 8,
+    "entries": [
+      {
+        "name": "buklet-vasiliya-evdokimova-polnyy.md",
+        "kind": "file"
+      },
+      {
+        "name": "dnk-analiz-po-psikhike-fizike-i-vitaminam.md",
+        "kind": "file"
+      },
+      {
+        "name": "dnk-razbor.md",
+        "kind": "file"
+      },
+      {
+        "name": "geneticheskaya-kniga-vasiliya-evdokimova.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "geneticheskaya-kniga-vasiliya-evdokimova.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "moya-vnutrennyaya-sila-vasiliy-evdokimov.md",
+        "kind": "file"
+      },
+      {
+        "name": "pitanie-i-nutrienty-vasiliya-evdokimova.md",
+        "kind": "file"
+      },
+      {
+        "name": "psikhologicheskiy-i-fiziologicheskiy-profil-vasiliya-evdokimova.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "05-faith",
+    "title": "Вера",
+    "desc": "Вера только как черта личности — не богословие (см. christ-walk)",
+    "fileCount": 5,
+    "entries": [
+      {
+        "name": "dnevnik-ispovedi.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "dnevnik-ispovedi.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "dogovor-very-v-iisusa-khrista.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "dogovor-very-v-iisusa-khrista.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "generate_prayer_audio.py",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "06-diaries",
+    "title": "Дневники",
+    "desc": "Дневники, включая материальный дневник по частям",
+    "fileCount": 348,
+    "entries": [
+      {
+        "name": "materialnyy-dnevnik",
+        "kind": "dir",
+        "count": 4
+      },
+      {
+        "name": "nablyudenie-za-snovideniyami-i-snom.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "nablyudenie-za-snovideniyami-i-snom.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "notion-reflections",
+        "kind": "dir",
+        "count": 330
+      },
+      {
+        "name": "Дневник материальный-1-55.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-1-55.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-1-81.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-1-81.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-110-162.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-110-162.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-56-109.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-56-109.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-82-162.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник материальный-82-162.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник сна.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Дневник сна.docx.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "07-self-reflection",
+    "title": "Саморефлексия",
+    "desc": "«Книга возвращения к себе», аксиоматика мировоззрения",
+    "fileCount": 116,
+    "entries": [
+      {
+        "name": " Оценка в рамках проекта «Центры компетенций» – Жизнестойкость_5cf07faf-33e4-4f67-b451-97ea75dde4a6.pdf",
+        "kind": "file"
+      },
+      {
+        "name": " Оценка в рамках проекта «Центры компетенций» – Жизнестойкость_5cf07faf-33e4-4f67-b451-97ea75dde4a6.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "2026-04-19-notion-habit-tracker.md",
+        "kind": "file"
+      },
+      {
+        "name": "2026-05-05-reading-habits-survey.md",
+        "kind": "file"
+      },
+      {
+        "name": "Human Behavior.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Human Behavior.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Rabbit Hole.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Rabbit Hole.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "kniga-vozvrashcheniya-k-sebe-chernovik.md",
+        "kind": "file"
+      },
+      {
+        "name": "kniga-vozvrashcheniya-k-sebe.md",
+        "kind": "file"
+      },
+      {
+        "name": "modul-9.md",
+        "kind": "file"
+      },
+      {
+        "name": "vk-graph 1.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "vk-graph 1.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "vk-graph 2.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "vk-graph 2.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "vkgraph_38d41d62.graphml",
+        "kind": "file"
+      },
+      {
+        "name": "vkgraph_38d41d62.json",
+        "kind": "file"
+      },
+      {
+        "name": "vkgraph_f8496d92.graphml",
+        "kind": "file"
+      },
+      {
+        "name": "vkgraph_f8496d92.json",
+        "kind": "file"
+      },
+      {
+        "name": "Аксиоматика моего мировоззрения (первая итерация).docx",
+        "kind": "file"
+      },
+      {
+        "name": "Аксиоматика моего мировоззрения (первая итерация).docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Анализ голоса.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Анализ голоса.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Анализ_IQ_Евдокимов.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Анализ_IQ_Евдокимов.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Анализ_внешности_Василий.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Анализ_внешности_Василий.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Буклет Василия Евдокимова — ПОЛНЫЙ.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Буклет Василия Евдокимова — ПОЛНЫЙ.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Генетическая книга Василия Евдокимова.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Генетическая книга Василия Евдокимова.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Граф друзья друзей (по 10).pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Граф друзья друзей (по 10).pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "ДНК разбор.docx",
+        "kind": "file"
+      },
+      {
+        "name": "ДНК разбор.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "ДНК-анализ по психике, физике и витаминам.docx",
+        "kind": "file"
+      },
+      {
+        "name": "ДНК-анализ по психике, физике и витаминам.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "ИНТЕРВАЛЬНОЕ ГОЛОДАНИЕ.docx",
+        "kind": "file"
+      },
+      {
+        "name": "ИНТЕРВАЛЬНОЕ ГОЛОДАНИЕ.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "КПТ-3.docx",
+        "kind": "file"
+      },
+      {
+        "name": "КПТ-3.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Как отпустить стыд прошлого и провалов — Василий Евдокимов.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Как отпустить стыд прошлого и провалов — Василий Евдокимов.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Книга возвращения к себе (полная).docx",
+        "kind": "file"
+      },
+      {
+        "name": "Книга возвращения к себе (полная).docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Книга возврщаения к себе.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Книга возврщаения к себе.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Корни моего глубокой жажды к самопознанию.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Корни моего глубокой жажды к самопознанию.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Мотивационно-ценностный профиль проекта «Центры компетенций»_82c6b769-cc0c-4ca2-aa27-10ec94fe5938.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Мотивационно-ценностный профиль проекта «Центры компетенций»_82c6b769-cc0c-4ca2-aa27-10ec94fe5938.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Моя внутренняя сила — Василий Евдокимов.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Моя внутренняя сила — Василий Евдокимов.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Наблюдение за сновидениями и сном.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Наблюдение за сновидениями и сном.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Научный метод познания.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Научный метод познания.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Обратная связь психолога 03.12.25.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Обратная связь психолога 03.12.25.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Отчет по результатам дистанционной оценки: \"Анализ информации\"_02d57baf-e8aa-4d49-98b6-529e1ec970e8.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Отчет по результатам дистанционной оценки: \"Анализ информации\"_02d57baf-e8aa-4d49-98b6-529e1ec970e8.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Отчет по результатам дистанционной оценки: \"Клиентоориентированность\"_1e6802cc-480a-48f3-a16d-426c279b695a.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Отчет по результатам дистанционной оценки: \"Клиентоориентированность\"_1e6802cc-480a-48f3-a16d-426c279b695a.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Отчет по результатам дистанционной оценки: \"Пассивный словарный запас\"_772db2f0-f61b-4be9-b009-da6fddd113ea.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Отчет по результатам дистанционной оценки: \"Пассивный словарный запас\"_772db2f0-f61b-4be9-b009-da6fddd113ea.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Отчет по результатам дистанционной оценки: \"Эмоциональный интеллект\"_2daef16b-a666-4b3c-a868-46822b6ef926.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Отчет по результатам дистанционной оценки: \"Эмоциональный интеллект\"_2daef16b-a666-4b3c-a868-46822b6ef926.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка в рамках проекта «Центры компетенций» – Универсальный личностный опросник_c37a72dd-a20b-4d18-90e4-fc2a59f745d9.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка в рамках проекта «Центры компетенций» – Универсальный личностный опросник_c37a72dd-a20b-4d18-90e4-fc2a59f745d9.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка в рамках проекта «Центры компетенций» – Ценностные установки лидерства_0384da0d-b621-439f-a621-c204aa3ff5ce.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка в рамках проекта «Центры компетенций» – Ценностные установки лидерства_0384da0d-b621-439f-a621-c204aa3ff5ce.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка в рамках проекта «Центры компетенций»_53eb3a5d-e694-4cb2-ad29-a85709da37c0.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка в рамках проекта «Центры компетенций»_53eb3a5d-e694-4cb2-ad29-a85709da37c0.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка девушек.html",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка девушек.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Оценка девушек.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Питание и нутриенты Василия Евдокимова.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Питание и нутриенты Василия Евдокимова.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Практики.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Практики.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Привычки.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Привычки.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Психологический и физиологический профиль Василия Евдокимова.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Психологический и физиологический профиль Василия Евдокимова.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Результаты теста 03.12.25.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Результаты теста 03.12.25.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Рутина.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Рутина.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Системы.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Системы.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Скорочтение.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Скорочтение.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Тень.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Тень.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Тесты личности 16Personalities.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "Тесты личности 16Personalities.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "Тесты.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Тесты.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Углублённый отчёт — Мышление и устойчивость.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Углублённый отчёт — Мышление и устойчивость.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Цели 2025.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Цели 2025.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Шахматы.docx",
+        "kind": "file"
+      },
+      {
+        "name": "Шахматы.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "Я и подличности (IFS - Internal Family System и Embedied-пдоход).docx",
+        "kind": "file"
+      },
+      {
+        "name": "Я и подличности (IFS - Internal Family System и Embedied-пдоход).docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "обратная связь кареьрного психолога по профтестированию 2022.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "обратная связь кареьрного психолога по профтестированию 2022.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "обратная связь кареьрного психолога по профтестированию 2023.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "обратная связь кареьрного психолога по профтестированию 2023.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "резенция карьерного психолога на результаты третьего теста.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "резенция карьерного психолога на результаты третьего теста.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "результаты 2023.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "результаты 2023.pdf.md",
+        "kind": "file"
+      },
+      {
+        "name": "третий раз прохожу Евдокимов Василий Максимович.pdf",
+        "kind": "file"
+      },
+      {
+        "name": "третий раз прохожу Евдокимов Василий Максимович.pdf.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "08-feedback",
+    "title": "Обратная связь",
+    "desc": "Обратная связь от других людей о владельце",
+    "fileCount": 15,
+    "entries": [
+      {
+        "name": "obratnaya-svyaz-o-vasilie-evdokimove.csv",
+        "kind": "file"
+      },
+      {
+        "name": "pleasant-words",
+        "kind": "dir",
+        "count": 14
+      }
+    ]
+  },
+  {
+    "dir": "09-session-summaries",
+    "title": "Итоги сессий",
+    "desc": "Сводки психологических сессий",
+    "fileCount": 2,
+    "entries": [
+      {
+        "name": "sammari-psikhologicheskogo-chata-bez-vlozheniy.md",
+        "kind": "file"
+      },
+      {
+        "name": "sammari-psikhologicheskogo-chata-s-vlozheniyami.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "10-life-history",
+    "title": "История жизни",
+    "desc": "История жизни по периодам, реестр фактов и гипотез",
+    "fileCount": 90,
+    "entries": [
+      {
+        "name": "00-protocol",
+        "kind": "dir",
+        "count": 7
+      },
+      {
+        "name": "01-registry",
+        "kind": "dir",
+        "count": 5
+      },
+      {
+        "name": "02-notes",
+        "kind": "dir",
+        "count": 16
+      },
+      {
+        "name": "03-reports",
+        "kind": "dir",
+        "count": 7
+      },
+      {
+        "name": "04-deliverables",
+        "kind": "dir",
+        "count": 6
+      },
+      {
+        "name": "09-history",
+        "kind": "dir",
+        "count": 46
+      },
+      {
+        "name": "README.md",
+        "kind": "file"
+      },
+      {
+        "name": "index.md",
+        "kind": "file"
+      },
+      {
+        "name": "watchlog.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "11-external-sources",
+    "title": "Внешние источники",
+    "desc": "Telegram-канал «МОЗГ.ПСИХОЛОГИЯ» и другие внешние материалы",
+    "fileCount": 5,
+    "entries": [
+      {
+        "name": "README.md",
+        "kind": "file"
+      },
+      {
+        "name": "mozg-psikhologiya-zavisimost-2023.md",
+        "kind": "file"
+      },
+      {
+        "name": "mozg-psikhologiya-zavisimost-2024.md",
+        "kind": "file"
+      },
+      {
+        "name": "mozg-psikhologiya-zavisimost-2025.md",
+        "kind": "file"
+      },
+      {
+        "name": "mozg-psikhologiya-zavisimost-2026.md",
+        "kind": "file"
+      }
+    ]
+  },
+  {
+    "dir": "99-misc",
+    "title": "Разное",
+    "desc": "To-do и неразложенное",
+    "fileCount": 14,
+    "entries": [
+      {
+        "name": "To-do list (черновик).docx",
+        "kind": "file"
+      },
+      {
+        "name": "To-do list (черновик).docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "To-do list.docx",
+        "kind": "file"
+      },
+      {
+        "name": "To-do list.docx.md",
+        "kind": "file"
+      },
+      {
+        "name": "career-guidance",
+        "kind": "dir",
+        "count": 6
+      },
+      {
+        "name": "to-do-list-chernovik.md",
+        "kind": "file"
+      },
+      {
+        "name": "to-do-list.md",
+        "kind": "file"
+      },
+      {
+        "name": "модуль 9.docx",
+        "kind": "file"
+      },
+      {
+        "name": "модуль 9.docx.md",
+        "kind": "file"
+      }
+    ]
+  }
+]

@@ -48,14 +48,26 @@ import argparse
 import zipfile
 from pathlib import Path
 
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent
+REPOS = BASE_REPO.parent
 DOWNLOADS = Path.home() / "Downloads"
 
 HARD_FILE = 100 * 2**20      # push отклоняется
 WARN_FILE = 50 * 2**20       # предупреждение GitHub
-SOFT_REPO = 5 * 2**30        # рекомендуемый максимум репы
+SOFT_REPO = 5 * 2**30        # рекомендуемый максимум репы (лимит GitHub, не наш)
 MD_RENDER = 1 * 2**20        # выше — GitHub не рендерит .md
 MANY_FILES = 20_000          # деградация клона и git status
+
+# 🔴 Наш норматив (01-repo-standard.md §4, 06-volume-compression.md) — СТРОЖЕ,
+# чем лимит GitHub (5 ГБ), и про другое: не «примет ли git», а «возьмёт ли Claude
+# архив целиком». Добавлено 26.08.2026: misc-vault (674 МБ) и academic-portfolio
+# (1018 МБ) прошли git-лимиты чисто (оба ≪ 5 ГБ) и ушли в архив без единого
+# предупреждения — этот скрипт проверял только «пройдёт ли в git», не «уложились
+# ли в наш норматив». pack_release.py получил тот же порог отдельно (PIT-146);
+# здесь — тот же норматив для системной сверки по всем репам разом.
+OUR_TARGET = 50 * 2**20      # 🟢 цель
+OUR_SOFT = 100 * 2**20       # 🟡 мягкий
+OUR_HARD = 500 * 2**20       # 🔴 жёсткий — Claude не берёт архив целиком
 
 SKIP_PARTS = {".git", "_base", "node_modules", ".venv", "__pycache__"}
 
@@ -81,7 +93,19 @@ def check_repo(repo: Path) -> list[str]:
         elif p.suffix.lower() == ".md" and size > MD_RENDER:
             problems.append(f"⚠️  .md не отрендерится ({size / 2**20:.1f} МБ)  {rel}")
     if total > SOFT_REPO:
-        problems.append(f"⚠️  репа {total / 2**30:.1f} ГБ — выше рекомендуемых 5 ГБ")
+        problems.append(f"⚠️  репа {total / 2**30:.1f} ГБ — выше рекомендуемых GitHub 5 ГБ")
+    if total > OUR_HARD:
+        _exc = repo / ".size-exception"
+        if _exc.is_file():
+            problems.append(f"🟡 {total / 2**20:.0f} МБ — выше нашего жёсткого 500 МБ, но есть "
+                             f".size-exception: {_exc.read_text(encoding='utf-8').strip()[:100]}")
+        else:
+            problems.append(f"🔴 {total / 2**20:.0f} МБ — выше НАШЕГО жёсткого потолка 500 МБ "
+                             f"(01-repo-standard.md §4) — Claude не возьмёт архив целиком")
+    elif total > OUR_SOFT:
+        problems.append(f"🟡 {total / 2**20:.0f} МБ — выше нашего мягкого 100 МБ")
+    elif total > OUR_TARGET:
+        problems.append(f"🟡 {total / 2**20:.0f} МБ — выше нашей цели 50 МБ")
     if count > MANY_FILES:
         problems.append(f"⚠️  файлов {count} — клон и `git status` деградируют")
     return problems

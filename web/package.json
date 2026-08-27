@@ -1,0 +1,26 @@
+{
+  "name": "self-map-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Веб-приложение для навигации по self-map: разделы анамнеза, реестр фактов, поиск. Данные читаются из репозитория, своей базы не заводит. Чисто клиентское, без бэкенда, без сети.",
+  "scripts": {
+    "predev": "node scripts/sync-data.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/sync-data.mjs",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  }
+}

@@ -12,10 +12,10 @@
 
 | Поле | Значение |
 |---|---|
-| **Версия карты** | 3.3.0 |
-| **Актуальность** | 2026-08-25 |
+| **Версия карты** | 3.5.0 |
+| **Актуальность** | 2026-08-26 |
 | **Проверена целиком** | 2026-08-16 |
-| **Репозиториев** | 59 заведено · 0 запланировано |
+| **Репозиториев** | 61 заведено · 0 запланировано |
 | **Сопровождение** | полуавтоматическое — `deploy.sh` регистрирует новые репы заглушкой |
 | **История изменений** | [`repos-map-CHANGELOG.md`](./repos-map-CHANGELOG.md) |
 
@@ -35,7 +35,7 @@
 |---|---|---|---|
 | **infra** | инфраструктура системы, тематики нет | вечно | 2 |
 | **core** | зона жизни, на века | вечно, не мерджится никуда | 14 |
-| **satellite** | самостоятельный домен, вынесен ради удобства | отдельно неопределённо долго | 23 |
+| **satellite** | самостоятельный домен, вынесен ради удобства | отдельно неопределённо долго | 24 |
 | **temp** | часть core-репы, вынесенная из-за объёма | **вернётся** в родителя | 6 |
 | **product** | работающий продукт | своя жизнь, релизы | 11 |
 
@@ -49,7 +49,7 @@
 
 **🏛️ Ядро — зоны жизни** (14) — [`it-base`](#it-base) · [`edu-base`](#edu-base) · [`academic-portfolio`](#academic-portfolio) · [`health-vault`](#health-vault) · [`legal-knowledge-base`](#legal-knowledge-base) · [`christ-walk`](#christ-walk) · [`self-map`](#self-map) · [`truth-seeking`](#truth-seeking) · [`family`](#family) · [`misc-vault`](#misc-vault) · [`research-craft`](#research-craft) · [`money`](#money) · [`productivity`](#productivity) · [`career`](#career)
 
-**🛰️ Спутники — самостоятельные домены** (23) — [`dota-dossier`](#dota-dossier) · [`chess`](#chess) · [`csgo`](#csgo) · [`sport`](#sport) · [`nutrition`](#nutrition) · [`style`](#style) · [`acting`](#acting) · [`rhetoric`](#rhetoric) · [`linguistics`](#linguistics) · [`sales`](#sales) · [`spycraft`](#spycraft) · [`politics`](#politics) · [`war`](#war) · [`security-forces`](#security-forces) · [`cybersecurity`](#cybersecurity) · [`science`](#science) · [`art`](#art) · [`philosophy`](#philosophy) · [`history`](#history) · [`nationality`](#nationality) · [`speed-reading`](#speed-reading) · [`visual-style`](#visual-style) · [`ai-relay`](#ai-relay)
+**🛰️ Спутники — самостоятельные домены** (24) — [`dota-dossier`](#dota-dossier) · [`chess`](#chess) · [`csgo`](#csgo) · [`sport`](#sport) · [`nutrition`](#nutrition) · [`style`](#style) · [`acting`](#acting) · [`rhetoric`](#rhetoric) · [`linguistics`](#linguistics) · [`sales`](#sales) · [`spycraft`](#spycraft) · [`politics`](#politics) · [`war`](#war) · [`security-forces`](#security-forces) · [`cybersecurity`](#cybersecurity) · [`science`](#science) · [`art`](#art) · [`philosophy`](#philosophy) · [`history`](#history) · [`nationality`](#nationality) · [`speed-reading`](#speed-reading) · [`visual-style`](#visual-style) · [`ai-relay`](#ai-relay) · [`business`](#business)
 
 **⏳ Временные — вернутся в родителя** (6) — [`algorithms`](#algorithms) · [`ml-base`](#ml-base) · [`mathematics`](#mathematics) · [`physics`](#physics) · [`chemistry`](#chemistry) · [`biology`](#biology)
 
@@ -310,6 +310,20 @@ OPSEC, шифрование, анонимность, цифровая гигие
 Claude не обрабатывает звук и видео напрямую. Репа держит рабочие маршруты: какой бесплатный сторонний сервис закрывает конкретный пробел, точные шаги загрузки и — главное — в каком виде экспортировать результат обратно, чтобы Claude мог продолжить работу в своём формате. Не склад промптов вообще, только там, где Claude объективно не может, а не там, где просто лень разбираться.
 
 Заведена 20.08.2026 по прямому заказу (`mission-control/BACKLOG.md` п. 33). Граница с `it-base`: общие ресёрчи про лимиты/режимы самих моделей Claude — туда, не сюда; здесь только маршруты через чужие сервисы.
+
+---
+
+## 🏢 `business`
+
+**Бизнес: учредители, ИП/ООО, управление и лидерство, масштабирование**
+
+Как основать и вести своё дело — учредители/основатели, юридические формы (ИП/ООО),
+управление и лидерство (роль CEO), масштабирование и рост. Прикладной трекинг развития
+как предпринимателя, не общая теория менеджмента.
+
+Заведена 26.08.2026 по прямому запросу владельца («хочу развиваться как бизнесмен»).
+Граница с `career`: наёмная карьерная стратегия → `career`, ведение собственного дела →
+сюда. Граница с `money`: личные финансы → `money`, финансы бизнеса → сюда.
 
 ---
 

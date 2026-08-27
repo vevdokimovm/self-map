@@ -35,11 +35,13 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent
+REPOS = BASE_REPO.parent
 TODAY = date.today().isoformat()
 
 # Как читает версию сам deploy.sh — сверяемся ровно этим выражением, а не похожим.
@@ -136,7 +138,29 @@ def main() -> int:
     if not repo.is_dir():
         sys.exit(f"нет репы: {repo}")
     vf = repo / "VERSION"
-    cur = vf.read_text(encoding="utf-8").strip() if vf.is_file() else "0.0.0"
+    if vf.is_file():
+        cur = vf.read_text(encoding="utf-8").strip()
+    else:
+        # 🔴 PIT-143: «нет локального VERSION» ≠ «репа не публиковалась». exam-kit
+        # вёл 21 релиз собственным процессом (без local VERSION) — подъём с 0.0.0
+        # оказался НИЖЕ уже опубликованного v1.21.1, деплой отказал, а объяснение
+        # владельцу («это разный счётчик») было домыслом до проверки факта.
+        # Раз файла нет — спросить GitHub, а не молчать про 0.0.0.
+        cur = "0.0.0"
+        rid = repo / ".repo-id"
+        if rid.is_file():
+            slug = rid.read_text(encoding="utf-8").strip()
+            try:
+                out = subprocess.run(
+                    ["gh", "api", f"repos/{slug}/tags", "--jq", ".[0].name"],
+                    capture_output=True, text=True, timeout=15)
+                latest = out.stdout.strip().lstrip("v")
+                if latest and re.match(r"^\d+\.\d+\.\d+$", latest):
+                    print(f"  🔴 локального VERSION нет, но на GitHub уже есть тег v{latest} "
+                          f"({slug}) — считаю от него, не от 0.0.0", file=sys.stderr)
+                    cur = latest
+            except Exception:
+                pass  # gh недоступен/репа ещё не создана — 0.0.0 остаётся законным умолчанием
     kind = "major" if a.major else "patch" if a.patch else "minor"
     new = bump(cur, kind)
     tag = {"major": "MAJOR", "patch": "PATCH"}.get(kind, "MINOR")

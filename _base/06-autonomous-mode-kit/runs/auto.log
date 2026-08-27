@@ -1,0 +1,41 @@
+2026-08-26T13:03:36	base-repo	batch	v3.34.2: журнал автономного прогона добавлен (тестовая запись)
+2026-08-26T13:06:08	base-repo	batch	v3.35.0: журнал автономного прогона реализован и подключён в скиллу
+2026-08-26T13:15:23	base-repo	batch	v3.36.0: 20 групп дублей закрыто, 2 реальных устранены
+2026-08-26T13:18:58	base-repo	batch	v3.36.1: PIT-124 частично закрыт, найден второй экземпляр account-data
+2026-08-26T13:20:01	base-repo	skip	scan.csv топ-50: топ кандидатов - CHANGELOG личных реп (self-map/character-a-analysis/portrait-of-taste) и защищённой personal-finance-dss. Извлечение правил из личного контента требует суждения с владельцем, не решается в /auto
+2026-08-26T13:22:38	base-repo	batch	v3.36.2: кампания обслуживания - место сверено, устарело, очищено 224КБ
+2026-08-26T13:29:18	base-repo	batch	v3.36.3: dota-dossier PITFALLS.md сведён к канону
+2026-08-26T13:45:03	base-repo	batch	v3.37.0: лидерборды классов закрыты полностью
+2026-08-26T13:59:26	research-engine	skip	VERSION файл (6 байт, GitHub уже v0.2.1) - таймауты среды на чтение/запись этого конкретного файла, повторю позже
+2026-08-26T15:05:28	base-repo	batch	v3.38.1: PIT-147 (порча корня) починена, WATCHLOG.md в корень, порог раздачи базы, PIT-G случай 8
+2026-08-26T15:12:12	mission-control	batch	v1.13.3: BOARD.md покрытие 62/62 подтверждено, vevdokimovm добавлен, ROADMAP-пункт базы закрыт
+2026-08-26T15:14:52	base-repo	batch	v3.39.0: ROADMAP доска BOARD.md закрыта (62/62, guard 1 чист), vevdokimovm добавлен
+2026-08-26T15:18:13	base-repo	batch	v3.40.0: ROADMAP два пункта закрыты задним числом (доска BOARD.md, автопродолжение лимита)
+2026-08-26T15:27:22	base-repo	batch	v3.41.1: 66 §3б/§3в модель по классам реп + метрика качество/токен; PIT-G случай 9
+2026-08-26T15:32:16	base-repo	batch	v3.42.0: хук на _base/ (protect-base-mirror.sh, PreToolUse) закрыт
+2026-08-26T15:42:52	base-repo	batch	v3.43.1: .claude/ роздан 57 репам (защита _base/ системная), гейт DRIFT починен
+2026-08-26T15:55:50	base-repo	batch	v3.44.2: PIT-124 п.1 закрыт (секрет найден и записан владельцу), три DRIFT-патча на путь в кавычках §0
+2026-08-26T16:02:45	base-repo	batch	v3.45.0: кампания обслуживания машины закрыта (версии обследованы, 90 пакетов brew, отчёт без обновления)
+2026-08-26T16:08:00	base-repo	batch	v3.46.0: 5 из 6 задач заказа 22.08.2026 (классы сущностей, медиа-лаба, манифесты, файл->репа, аудио/видео) найдены сделанными
+2026-08-26T16:56:48	base-repo	batch	v3.47.0: заказ 22.08.2026 закрыт целиком (репа business, schizophrenic_things, чистка тяжёлого 726 файлов)
+2026-08-26T17:33:36	base-repo	batch	v3.48.1: PIT-148 (WATCHLOG §0 vs deploy.sh канон) починен, счётчик PIT поправлен
+2026-08-26T17:37:09	base-repo	batch	v3.49.0: /tokens срез, пятое подтверждение формы цены хода х5.1
+2026-08-26T17:41:06	base-repo	batch	v3.49.1: /tokens срез, шестое подтверждение формы, нового сигнала нет
+2026-08-26T17:48:36	base-repo	batch	v3.50.0: owner_blockers.py, свод блокировок владельца, 50 из 59 репов на одной формулировке
+2026-08-26T17:48:36	mission-control	batch	v1.13.5: свод блокировок владельца записан в TASKS.md (50 из 59 репов)
+2026-08-26T17:52:07	base-repo	batch	v3.51.0: генератор скелета пп.1-2 подтверждены закрытыми, п.3 (критерий выхода MVP) остаётся
+2026-08-27T01:21:25	base-repo	batch	v3.55.0: docs->text 99.9%, ~/repos path fix in 19 scripts
+2026-08-27T01:33:12	base-repo	batch	v3.56.0: images started (2 series), sync_base_local --all (47 repos to v3.56.0)
+2026-08-27T01:41:27	base-repo	batch	v3.56.1: 4 more image series (75 frames total this session)
+2026-08-27T01:47:09	base-repo	batch	v3.56.2: dota-dossier images (132 frames total this session)
+2026-08-27T01:52:08	base-repo	batch	v3.56.3: 17 more image frames (149 total this session)
+2026-08-27T01:57:21	base-repo	batch	v3.56.4: edu-base guitar chords catalogued (180 frames total this session)
+2026-08-27T02:10:12	base-repo	batch	v3.57.1: 89-corpus-hypothesis-discipline.md raised from scan.csv, README stale count fixed
+2026-08-27T02:14:11	base-repo	batch	v3.58.0: engineering_practices.md schema-as-safety-net rule from scan.csv
+2026-08-27T02:21:13	base-repo	batch	v3.58.1: 28 more thesis figures (208 image frames total this session)
+2026-08-27T09:44:53	base-repo	batch	v3.58.2: По ВКР subfolder complete (222 image frames total this session)
+2026-08-27T10:05:09	base-repo	batch	v3.59.0: campaign scope confirmed by owner, 238 image frames total, method doc improved
+2026-08-27T10:21:13	base-repo	batch	v3.59.1: 12 more series + 6 cross-file duplicates found
+2026-08-27T10:28:09	base-repo	batch	v3.59.2: KIM article figures + user survey charts (271 image frames total)
+2026-08-27T10:38:51	base-repo	batch	v3.59.3: bron-kerbosch + hw3 panorama photos (277 image frames total)
+2026-08-27T10:47:37	base-repo	batch	v3.59.4: science/dota-dossier/edu-base image series (292 frames total)

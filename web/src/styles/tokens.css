@@ -1,0 +1,68 @@
+/* Дизайн-токены — тихая, некликиническая палитра для личного инструмента
+   рефлексии (не архив family, не дашборд health-vault). Тёмно-синий/индиго
+   фон, мягкий сиреневый акцент — состояние «читаю о себе поздним вечером»,
+   не «отчёт о проблемах». Статусные цвета реестра отделены от акцента.
+
+   🔴 Без внешних сетевых вызовов: шрифты — только системный стек, без
+   Google Fonts/CDN — приложение открывается без интернета. */
+
+:root {
+  --c-bg: #14151c;
+  --c-surface: #1c1e28;
+  --c-surface-2: #262836;
+  --c-border: #343650;
+
+  --c-text: #e8e6f0;
+  --c-text-soft: #a8a6bd;
+  --c-text-faint: #6f6d85;
+
+  --c-accent: #8b7fd6;
+  --c-accent-soft: #2a2540;
+  --c-accent-strong: #a89ae8;
+
+  /* статусные цвета реестра — отдельно от акцента, семантические не декоративные */
+  --c-status-confirmed: #6fbf8b;
+  --c-status-flag: #e0827a;
+  --c-status-method: #6fa8bf;
+  --c-status-pending: #d6b56f;
+
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 20px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px -10px rgba(0, 0, 0, 0.55);
+
+  --font-display: Charter, "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --font-body: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+}
+
+:root[data-theme="light"] {
+  --c-bg: #f1efee;
+  --c-surface: #ffffff;
+  --c-surface-2: #e9e6ed;
+  --c-border: #d6d2de;
+  --c-text: #201f2b;
+  --c-text-soft: #5a5670;
+  --c-text-faint: #8a869c;
+  --c-accent: #6a5cc4;
+  --c-accent-soft: #ece9f8;
+  --c-accent-strong: #564aad;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-body);
+}

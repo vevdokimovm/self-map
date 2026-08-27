@@ -43,7 +43,8 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 BASE = Path.home() / "Documents" / "base-repo"
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent
+REPOS = BASE_REPO.parent
 BOARD = REPOS / "mission-control" / "BOARD.md"
 
 OPEN_RE = re.compile(r"^\s*[-*]\s*\[ \]\s*(.+)$")

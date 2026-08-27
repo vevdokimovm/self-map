@@ -37,7 +37,8 @@ import argparse
 import hashlib
 from pathlib import Path
 
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent
+REPOS = BASE_REPO.parent
 SKIP_NAMES = {".DS_Store", ".gitkeep"}
 
 # 🔴 МУСОР, КОТОРЫЙ ПРИЕХАЛ С МАТЕРИАЛОМ. Word держит файл-замок `~$имя.docx` (162 байта,

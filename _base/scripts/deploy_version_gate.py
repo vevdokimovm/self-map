@@ -57,7 +57,7 @@ FROZEN_PREFIXES = (
     "templates/_archive/",
     "templates/deploy-CHANGELOG.md",
     "CHANGELOG.md",
-    "00-infrastructure/WATCHLOG.md",
+    "WATCHLOG.md",
     "repos-map-CHANGELOG.md",
 )
 

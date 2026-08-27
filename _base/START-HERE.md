@@ -37,7 +37,7 @@
    `templates/` (шаблоны) и `reports/` (система отчётности: шаблоны, гайды, реестры, папки по типам).
 2. Возьми `templates/REPO_README_TEMPLATE.md` → заполни под конкретную репу →
    положи как корневой `README.md`. Возьми `templates/gitignore.template` → `.gitignore`.
-3. Возьми `00-infrastructure/03-watchlog-template.md` → скопируй в `00-infrastructure/WATCHLOG.md`,
+3. Возьми `00-infrastructure/03-watchlog-template.md` → скопируй в `WATCHLOG.md`,
    впиши текущее состояние репы (аккаунты V/J/M/S уже прописаны). Возьми
    `templates/CHANGELOG_TEMPLATE.md` → `CHANGELOG.md` — подробная append-only летопись
    (`24-changelog-protocol.md`). Журнал + changelog — разные инструменты (снимок «где мы» vs история).
@@ -130,7 +130,7 @@
 FINPILOT — рабочий софт (код, тесты, CI). Здесь — **базы знаний**: кода нет, гейтов нет,
 цель другая. Поэтому из FINPILOT взято только то, что относится к инфраструктуре знаний:
 нейминг, журнал, работа с Claude, сжатие в `.md`, правила чистоты, дисциплина непрерывности.
-Журнал живёт **в самой репе** (`00-infrastructure/WATCHLOG.md`) и коммитится — одна копия,
+Журнал живёт **в самой репе** (`WATCHLOG.md`) и коммитится — одна копия,
 без архивов.
 
 ---

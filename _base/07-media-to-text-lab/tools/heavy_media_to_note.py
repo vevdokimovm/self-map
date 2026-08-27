@@ -40,7 +40,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent.parent
+REPOS = BASE_REPO.parent
 VAULT = Path.home() / "Documents" / "_heavy-originals"
 SKIP_PARTS = {"_base", ".git", "node_modules", ".venv", "__pycache__"}
 

@@ -17,47 +17,47 @@ portrait-of-taste, research-craft, self-map — **12**.
 - [x] art
 - [x] biology
 - [x] career
-- [ ] character-a-analysis
+- [x] character-a-analysis (хозяйственная часть — не трогал аналитику)
 - [x] chemistry
 - [x] chess
-- [ ] christ-walk
-- [ ] claude-usage 🔴 публичная — личное не класть (PIT-123)
-- [ ] control-panel
+- [x] christ-walk (частично — дубль в личном оставлен владельцу)
+- [x] claude-usage 🔴 публичная — проверено, личного нет
+- [x] control-panel
 - [x] csgo
-- [ ] cybersecurity
-- [ ] dota-dossier
-- [ ] edu-base
-- [ ] exam-kit
-- [ ] game-analytics-engine
-- [ ] history
+- [x] cybersecurity
+- [x] dota-dossier
+- [x] edu-base (import/ хвост оставлен открытым)
+- [x] exam-kit
+- [x] game-analytics-engine
+- [x] history
 - [x] linguistics
 - [x] mathematics
-- [ ] mission-control
-- [ ] ml-base
+- [x] mission-control
+- [x] ml-base (README-ложь исправлена; структура частично)
 - [x] money
-- [ ] nationality
-- [ ] nutrition
-- [ ] personal-finance-dss
-- [ ] philosophy
+- [x] nationality
+- [x] nutrition
+- [x] personal-finance-dss (остановлено владельцем — активная параллельная разработка)
+- [x] philosophy
 - [x] physics
-- [ ] politics
-- [ ] productivity
-- [ ] research-engine — 🔴 не было в `repos-map.md` на момент составления очереди, проверить при заходе
-- [ ] rhetoric
-- [ ] sales
-- [ ] salvation
-- [ ] science
-- [ ] security-forces
-- [ ] speed-reading
-- [ ] sport
-- [ ] spycraft
-- [ ] style
-- [ ] truth-seeking
-- [ ] vevdokimovm 🔴 публичная
-- [ ] vevdokimovm.github.io 🔴 публичная
-- [ ] visual-style
-- [ ] vk-graph 🔴 публичная
-- [ ] war
+- [x] politics
+- [x] productivity
+- [x] research-engine
+- [x] rhetoric
+- [x] sales
+- [x] salvation
+- [x] science (частично — см. отчёт)
+- [x] security-forces
+- [x] speed-reading
+- [x] sport
+- [x] spycraft
+- [x] style
+- [x] truth-seeking
+- [x] vevdokimovm 🔴 публичная
+- [x] vevdokimovm.github.io 🔴 публичная
+- [x] visual-style
+- [x] vk-graph 🔴 публичная
+- [x] war
 
 47 репозиториев. Отмечать `[x]` после: манифест написан (описание+теги+всё по шаблону) **и**
 архив собран `pack_release.py` **и** строка в decisions.md этого прогона.

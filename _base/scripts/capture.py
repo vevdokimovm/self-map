@@ -58,7 +58,7 @@ SYN_CARDS = REPO / "05-infra-synthesis-lab" / "PITFALLS.md"
 ADR_DIR = REPO / "reports" / "adr"
 ADR_REGISTRY = ADR_DIR / "README.md"
 CLASS_BOARD = REPO / "reports" / "incidents" / "PITFALLS.md"
-WATCHLOG = REPO / "00-infrastructure" / "WATCHLOG.md"
+WATCHLOG = REPO / "WATCHLOG.md"
 
 TODAY = dt.date.today().isoformat()
 

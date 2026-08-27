@@ -16,20 +16,35 @@
 Побочно чинит артефакт iCloud-конфликтов: каталоги с суффиксом ` 2`, `` (2)`` и т.п.
 внутри `_base/` — заменяются с нуля, поэтому переживший мусор просто не копируется.
 
+🔴 ИСПРАВЛЕНО 27.08.2026 (найдено прямым вопросом владельца): `--all` раньше
+обходил только репы, где `_base/` уже существовал — репа, которая никогда
+её не получала (не отставание, а полное отсутствие), молча пропускалась
+навсегда. Так `_base/` не заводился в `personal-finance-dss`,
+`character-a-analysis`, `portrait-of-taste`, `mission-control` — 47 версий
+канона подряд. `--all` теперь обходит **все приватные репы на диске**
+(приватность — по `gh repo list`, один вызов на прогон, не по репе) и
+заводит `_base/` там, где его ещё не было, а не только обновляет существующий.
+Публичные репы по-прежнему не получают `_base/` никогда — правило ADR-004.
+Офлайн/`gh` недоступен → громкий отказ с текстом ошибки `gh`, старое
+поведение (только репы с уже существующим `_base/`) как ручной обходной путь
+(`--repo` поштучно), не тихий фолбэк.
+
 ЗАПУСК
-    sync_base_local.py <репа>              одна репа
-    sync_base_local.py --all               все репы с существующим _base/
+    sync_base_local.py <репа>              одна репа (заводит _base/, если его не было)
+    sync_base_local.py --all               все приватные репы на диске
     sync_base_local.py --check             только показать отставание, не трогать
 """
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 BASE_REPO = Path(__file__).resolve().parent.parent
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+REPOS = BASE_REPO.parent
 
 JUNK_DIRS = {".git", "__MACOSX", "__pycache__", ".ipynb_checkpoints", ".pytest_cache"}
 JUNK_NAMES = {".DS_Store", "Thumbs.db"}
@@ -53,6 +68,27 @@ def _copytree_clean(src: Path, dst: Path) -> None:
     def ignore(dirpath: str, names: list[str]) -> set[str]:
         return {n for n in names if n in JUNK_DIRS or n in JUNK_NAMES}
     shutil.copytree(src, dst, ignore=ignore, dirs_exist_ok=True)
+
+
+def private_repo_names(owner: str = "vevdokimovm") -> set[str]:
+    """Один вызов `gh` за весь прогон — какие репы owner'а приватные.
+
+    Громкий отказ, а не тихий фолбэк (`71-fail-loud-and-sourcing.md` §7ж):
+    если `gh` недоступен/не авторизован, вызывающий код обязан показать
+    текст ошибки и остановиться, а не молча вернуться к старому неполному
+    поведению — иначе тот же класс бага (репа без `_base/` пропущена
+    навсегда) повторится незаметно.
+    """
+    result = subprocess.run(
+        ["gh", "repo", "list", owner, "--limit", "500",
+         "--json", "name,isPrivate"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip() or "(пустой вывод)"
+        raise RuntimeError(f"gh repo list {owner} → код {result.returncode}\n{detail}")
+    data = json.loads(result.stdout)
+    return {r["name"] for r in data if r.get("isPrivate")}
 
 
 def sync_one(repo: Path, canon_version: str, check_only: bool) -> tuple[str, str]:
@@ -99,8 +135,25 @@ def main() -> int:
     canon_version = (BASE_REPO / "VERSION").read_text(encoding="utf-8").strip()
 
     if a.all:
-        targets = sorted(d for d in REPOS.iterdir() if d.is_dir() and (d / "_base").is_dir())
+        try:
+            private = private_repo_names()
+        except Exception as e:
+            print(f"✗ не удалось получить список приватных реп: {e}")
+            print("  --all требует рабочий `gh` (fail loud, не тихий фолбэк — "
+                  "71-fail-loud-and-sourcing.md §7ж). Обходной путь: "
+                  "sync_base_local.py <репа> поштучно.")
+            return 2
+        targets = sorted(
+            d for d in REPOS.iterdir()
+            if d.is_dir() and d.name != "base-repo" and d.name in private
+        )
     elif a.repo:
+        # 26.08.2026: base-repo не бывает получателем самой себя — без этой
+        # проверки одиночный запуск с "base-repo" пишет служебные маркеры
+        # (BASE_VERSION/DO-NOT-EDIT.md) в канон, а не в чужой _base/.
+        if a.repo == "base-repo":
+            print("✗ base-repo не может быть целью синхронизации — это источник канона")
+            return 2
         targets = [REPOS / a.repo]
     else:
         ap.error("нужно имя репы или --all")

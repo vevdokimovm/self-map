@@ -24,6 +24,16 @@ from pathlib import Path
 # кончились восемь скриптов деплоя до консолидации (templates/README.md).
 # Имя берётся из каталога, а не из константы: имя каталога и имя репы обязаны
 # совпадать, и если не совпали — это дефект, который лучше увидеть здесь.
+# 🔴 `--force-stubs` (PIT-145): порог 10% предполагает, что заглушка = данных
+# нет НИГДЕ рядом и тянуть их часы. Найдено 26.08.2026: при почти полном диске
+# (свободно ~9 ГБ) macOS «Optimize Mac Storage» вытесняет содержимое СРАЗУ ПОСЛЕ
+# чтения — файл материализуется за миллисекунды, но st_blocks==0 остаётся, будто
+# не тронут. Порог в этом режиме ложно блокирует репы, которые на самом деле
+# упаковались бы быстро: упаковка читает-и-сразу-пишет в zip, повторное
+# вытеснение УЖЕ ЗАПИСАННОГО байта не страшно.
+FORCE_STUBS = "--force-stubs" in sys.argv
+if FORCE_STUBS:
+    sys.argv.remove("--force-stubs")
 REPO = Path(sys.argv[1]).expanduser().resolve() if len(sys.argv) > 1 \
     else Path(os.environ.get("BASE_REPO", Path(__file__).resolve().parent.parent)).expanduser()
 OUT_DIR = Path.home() / "Downloads"
@@ -70,9 +80,12 @@ def main():
         print("   Упаковка читает каждый файл и потянет их из сети. Сначала материализовать:")
         print(f"     brctl download {REPO}")
         print("   Готовность: st_blocks > 0 у всех файлов.")
-        if _share > 10:
+        if _share > 10 and not FORCE_STUBS:
             print("   ⏭  НЕ ПАКУЮ — доля заглушек выше 10 %, архив собирался бы часами")
+            print("      (если диск почти полон и это ложные — PIT-145 — есть --force-stubs)")
             sys.exit(1)
+        elif FORCE_STUBS:
+            print("   --force-stubs: пакую несмотря на порог (PIT-145)")
 
     _over = [(f, f.stat().st_size) for f in _files if f.stat().st_size > 100 * 2**20]
     if _over:
@@ -82,6 +95,34 @@ def main():
         print("   Свернуть в служебки и собрать снова:")
         print(f"     python3 07-media-to-text-lab/tools/heavy_media_to_note.py --repo {NAME} --apply")
         sys.exit(1)
+
+    # 🔴 Суммарный вес репы — порог из 01-repo-standard.md §4, не проверялся здесь
+    # ДО 26.08.2026, из-за чего misc-vault (674 МБ) и academic-portfolio (1018 МБ)
+    # ушли в архив без единого предупреждения. Найдено владельцем при разборе
+    # деплоя: «у нас же есть правило максимум 500 МБ на репу??».
+    # Пороги те же, что для самой базы (06-volume-compression.md):
+    # 🟢 ≤50 МБ цель · 🟡 100 МБ мягкий · 🟡 500 МБ ещё мягче с явным обоснованием ·
+    # 🔴 >500 МБ жёсткий потолок — Claude физически не берёт архив целиком.
+    # Исключение — файл `.size-exception` в корне репы с обоснованием (образец:
+    # portrait-of-taste — эталоны фото нужны по существу задачи, не мусор).
+    _total = sum(f.stat().st_size for f in _files)
+    _total_mb = _total / 2**20
+    _exception = REPO / ".size-exception"
+    if _total_mb > 500:
+        if _exception.is_file():
+            print(f"🟡 {NAME}: {_total_mb:.0f} МБ — выше жёсткого потолка 500 МБ, но есть обоснование:")
+            print(f"   {_exception.read_text(encoding='utf-8').strip()}")
+        else:
+            print(f"🔴 {NAME}: {_total_mb:.0f} МБ — выше жёсткого потолка 500 МБ (01-repo-standard.md §4).")
+            print("   Свернуть тяжёлое в служебки через лабу медиа→текст:")
+            print(f"     python3 07-media-to-text-lab/tools/heavy_media_to_note.py --repo {NAME} --apply")
+            print("   Если вес обоснован (нужны сами эталоны, не мусор) — завести")
+            print(f"     {_exception} с обоснованием одной строкой, по образцу portrait-of-taste.")
+            sys.exit(1)
+    elif _total_mb > 100:
+        print(f"🟡 {NAME}: {_total_mb:.0f} МБ — выше мягкого порога 100 МБ, пакую, но стоит разобрать")
+    elif _total_mb > 50:
+        print(f"🟡 {NAME}: {_total_mb:.0f} МБ — выше цели 50 МБ, пакую")
 
     wrapper = f"{NAME}-v{version}"
     out = OUT_DIR / f"{wrapper}.zip"
@@ -115,8 +156,9 @@ def main():
             print(f"!! {NAME} уже пакуется другим процессом ({age / 60:.0f} мин назад).")
             print("   Параллельная сборка одной репы даёт БИТЫЙ архив — жду завершения.")
             sys.exit(1)
-        print(f"   (замок старше часа — вероятно, процесс убит; продолжаю)")
-        lock.unlink()
+        else:
+            print(f"   (замок старше часа — вероятно, процесс убит; продолжаю)")
+            lock.unlink(missing_ok=True)
     lock.write_text(str(os.getpid()), encoding="utf-8")
     # 🔴 Снятие замка через atexit, а не строкой в конце удачного пути.
     # Найдено владельцем 23.08.2026: в загрузках накопилось **14** файлов `*.zip.lock`.

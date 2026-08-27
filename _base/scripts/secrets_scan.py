@@ -31,7 +31,8 @@ import argparse
 import re
 from pathlib import Path
 
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent
+REPOS = BASE_REPO.parent
 BASE = Path.home() / "Documents" / "base-repo"
 
 # Сигнатуры значений. Ключ — что это, значение — как выглядит.
@@ -61,6 +62,9 @@ TEXT_EXT = {".env", ".envrc", ".py", ".sh", ".js", ".ts", ".json", ".yml", ".yam
             ".toml", ".cfg", ".ini", ".md", ".txt", ".conf", ".pem", ".key", ""}
 
 
+MAX_BYTES = 2_000_000  # переопределяется --max-mb (PIT-124: экспорты чатов легко больше)
+
+
 def scannable(p: Path) -> bool:
     if any(part in SKIP_PARTS for part in p.parts):
         return False
@@ -69,7 +73,7 @@ def scannable(p: Path) -> bool:
     if p.suffix.lower() not in TEXT_EXT:
         return False
     try:
-        return p.stat().st_size <= 2_000_000
+        return p.stat().st_size <= MAX_BYTES
     except OSError:
         return False
 
@@ -108,10 +112,15 @@ def selftest() -> bool:
 
 
 def main() -> int:
+    global MAX_BYTES
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo")
     ap.add_argument("--path")
+    ap.add_argument("--max-mb", type=float, default=2.0,
+                     help="потолок размера сканируемого файла в МБ (по умолчанию 2; "
+                          "PIT-124 — экспорты чатов вроде conversations.json легко больше)")
     a = ap.parse_args()
+    MAX_BYTES = int(a.max_mb * 1_000_000)
 
     if not selftest():
         print("🔴 КАНАРЕЙКА НЕ ПРОШЛА — сканер сломан, его молчание ничего не значит")

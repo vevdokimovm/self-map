@@ -11,9 +11,8 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
-DOCS = Path("/Users/vasyaevdokimov/Documents")
-CANON = DOCS / "base-repo"
-ROOT = DOCS / "система_репозиториев"
+CANON = Path(__file__).resolve().parent.parent
+ROOT = CANON.parent
 SKIP = {".git", "__MACOSX", "__pycache__", ".ipynb_checkpoints"}
 
 # репы, где 00-infrastructure/ — это плоская копия базы, а не свои протоколы

@@ -52,7 +52,8 @@ import sys
 import zipfile
 from pathlib import Path
 
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent.parent
+REPOS = BASE_REPO.parent
 SKIP_PARTS = {"_base", ".git", "node_modules", ".venv", "__pycache__", "90-imported"}
 
 PDF = {".pdf"}
@@ -159,7 +160,7 @@ def note(p: Path, repo: Path, text: str, units: int) -> str:
 """
 
 
-def process(repo: Path, apply: bool, limit: int) -> tuple[int, int, int]:
+def process(repo: Path, apply: bool, limit: int, force_stubs: bool = False) -> tuple[int, int, int]:
     done = empty = skipped = 0
     for p in sorted(repo.rglob("*")):
         if done + empty >= limit:
@@ -173,7 +174,11 @@ def process(repo: Path, apply: bool, limit: int) -> tuple[int, int, int]:
             skipped += 1
             continue
         try:
-            if p.stat().st_blocks == 0:      # заглушка iCloud — читать нельзя (PIT-135)
+            # 🔴 PIT-145 (26.08.2026): st_blocks==0 при почти полном диске значит
+            # «сейчас не резидентно», не «данных нет» — materialize-on-read работает
+            # за миллисекунды, macOS просто тут же вытесняет обратно. --force-stubs
+            # читает такие файлы всё равно (симметрично с pack_release.py).
+            if p.stat().st_blocks == 0 and not force_stubs:
                 skipped += 1
                 continue
         except OSError:
@@ -200,6 +205,8 @@ def main() -> int:
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--limit", type=int, default=100000)
+    ap.add_argument("--force-stubs", action="store_true",
+                     help="читать файлы с st_blocks==0 всё равно (PIT-145)")
     a = ap.parse_args()
 
     targets = ([REPOS / a.repo] if a.repo
@@ -211,7 +218,7 @@ def main() -> int:
     for t in targets:
         if not t.is_dir():
             continue
-        d, e, s = process(t, a.apply, a.limit - td - te)
+        d, e, s = process(t, a.apply, a.limit - td - te, a.force_stubs)
         if d or e or s:
             print(f"  {t.name:<26} выжимок {d:>4} · без текста {e:>4} · пропущено {s:>4}")
         td += d

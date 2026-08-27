@@ -10,7 +10,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-ROOT = Path("/Users/vasyaevdokimov/Documents/система_репозиториев")
 # 🔴 Путь к базе — одной строкой и через окружение (`ROADMAP.md` §P0 п. 6).
 # Замер 22.08.2026: `/Users/vasyaevdokimov/Documents/base-repo` был вписан строкой
 # в 15 файлов, и это единственное, что мешало перенести базу в каталог системы:
@@ -18,6 +17,7 @@ ROOT = Path("/Users/vasyaevdokimov/Documents/система_репозитори
 # Падение на путь скрипта, а не на константу: скрипт лежит В базе и знает, где он.
 BASE_ENV = os.environ.get("BASE_REPO")
 CANON = Path(BASE_ENV).expanduser() if BASE_ENV else Path(__file__).resolve().parent.parent
+ROOT = CANON.parent
 SKIP = {".git", "__MACOSX", "__pycache__", ".ipynb_checkpoints"}
 
 

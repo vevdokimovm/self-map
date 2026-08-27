@@ -156,7 +156,7 @@ bash 06-autonomous-mode-kit/bin/night.sh ~/Downloads/NIGHT-RUN-BRIEF.md 9
 **Команда для владельца:**
 
 ```
-! ~/Documents/base-repo/06-autonomous-mode-kit/bin/night.sh
+! ~/repos/base-repo/06-autonomous-mode-kit/bin/night.sh
 ```
 
 🔴 **Исправлено 25.08.2026:** бриф берётся из `06-autonomous-mode-kit/runs/NIGHT-RUN-BRIEF.md`

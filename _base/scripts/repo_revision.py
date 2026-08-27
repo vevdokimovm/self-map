@@ -42,7 +42,8 @@ import argparse
 import re
 from pathlib import Path
 
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent
+REPOS = BASE_REPO.parent
 BASE = Path.home() / "Documents" / "base-repo"
 
 # Путь в обратных кавычках: `01-lab-tests/`, `scripts/foo.py`, `README.md`

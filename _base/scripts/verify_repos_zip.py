@@ -7,7 +7,7 @@
 по размеру (= разное содержимое).
 
 Использование:
-    python3 scripts/verify_repos_zip.py [--owner vevdokimovm] [--dest ~/Documents/система_репозиториев]
+    python3 scripts/verify_repos_zip.py [--owner vevdokimovm] [--dest ~/repos]
     python3 scripts/verify_repos_zip.py --only base-repo,finpilot
 """
 import argparse
@@ -88,7 +88,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--owner", default="vevdokimovm")
     parser.add_argument(
-        "--dest", default=str(Path.home() / "Documents" / "система_репозиториев")
+        "--dest", default=str(Path(__file__).resolve().parent.parent.parent)
     )
     parser.add_argument("--only", default="")
     parser.add_argument("--skip-archived", action="store_true")

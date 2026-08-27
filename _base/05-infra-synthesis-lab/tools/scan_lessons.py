@@ -22,10 +22,10 @@ import sys
 import os
 from pathlib import Path
 
-ROOT = Path("/Users/vasyaevdokimov/Documents/система_репозиториев")
 # Путь к базе — через окружение, иначе от места скрипта (`ROADMAP.md` §P0 п. 6).
 # Скрипт лежит в `05-infra-synthesis-lab/tools/`, то есть на два уровня ниже корня.
 BASE = Path(os.environ.get("BASE_REPO") or Path(__file__).resolve().parents[2]).expanduser()
+ROOT = BASE.parent
 OUT = Path(sys.argv[1] if len(sys.argv) > 1 else "scan.csv")
 
 SKIP_DIR_PARTS = {".git", "node_modules", "__pycache__", ".venv", "venv", "__MACOSX"}

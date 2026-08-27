@@ -1,0 +1,215 @@
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-6);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface);
+}
+
+.nav__brand {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--c-text);
+  text-decoration: none;
+  margin-right: var(--sp-4);
+}
+
+.nav a.nav__link {
+  color: var(--c-text-soft);
+  text-decoration: none;
+  font-size: 0.95rem;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+}
+
+.nav a.nav__link:hover {
+  color: var(--c-text);
+  background: var(--c-surface-2);
+}
+
+.nav a.nav__link.active {
+  color: var(--c-accent-strong);
+  background: var(--c-accent-soft);
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--sp-8) var(--sp-6);
+}
+
+.page__title {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  margin: 0 0 var(--sp-2);
+}
+
+.page__lede {
+  color: var(--c-text-soft);
+  margin: 0 0 var(--sp-6);
+  max-width: 65ch;
+  line-height: 1.5;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sp-4);
+}
+
+.section-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  transition: border-color 0.15s ease;
+}
+
+.section-card:hover {
+  border-color: var(--c-accent);
+}
+
+.section-card__title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--c-text);
+}
+
+.section-card__desc {
+  color: var(--c-text-soft);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.section-card__count {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--c-text-faint);
+}
+
+.search-input {
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  color: var(--c-text);
+  font-size: 1rem;
+  margin-bottom: var(--sp-6);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--c-accent);
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.file-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+}
+
+.file-row:hover {
+  background: var(--c-surface-2);
+}
+
+.file-row__section {
+  color: var(--c-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.registry-tabs {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.registry-tab {
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: 999px;
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-text-soft);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.registry-tab.active {
+  border-color: var(--c-accent);
+  color: var(--c-accent-strong);
+  background: var(--c-accent-soft);
+}
+
+.registry-entry {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-3);
+}
+
+.registry-entry__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+
+.registry-entry__status {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.registry-entry__heading {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--c-text);
+  flex: 1;
+}
+
+.registry-entry__body {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+  color: var(--c-text-soft);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.notice {
+  background: var(--c-accent-soft);
+  border: 1px solid var(--c-accent);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  color: var(--c-text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: var(--sp-6);
+}
+
+.source-link {
+  color: var(--c-accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}

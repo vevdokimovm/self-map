@@ -21,8 +21,8 @@ import hashlib
 import sys
 from pathlib import Path
 
-BASE = Path.home() / "Documents" / "base-repo"
-ROOT = Path.home() / "Documents" / "система_репозиториев"
+BASE = Path(__file__).resolve().parent.parent
+ROOT = BASE.parent
 SKIP = {"base-repo", "Добавить ", "Old (before Claude)"}
 
 

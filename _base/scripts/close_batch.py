@@ -82,11 +82,28 @@ def write_watchlog(version: str, log_line: str, dry: bool) -> None:
     Подрезка обязательна: правило «§3 хранит ровно 10» не исполнялось 32 версии
     подряд, потому что опиралось на ручную дисциплину (`WATCHLOG` шапка).
     """
-    p = REPO / "00-infrastructure" / "WATCHLOG.md"
+    p = REPO / "WATCHLOG.md"
     t = p.read_text(encoding="utf-8")
-    t = re.sub(r"- \*\*Текущая точка: v[\d.]+\*\*[^\n]*",
-               f"- **Текущая точка: v{version}** ({date.today().strftime('%d.%m.%Y')}, вахта IX)",
-               t, count=1)
+    # 🔴 PIT-148: deploy.sh/bump_repo.py читают строго `**Версия:**`, а строка §0
+    # ходовой формы — «- **Версия:** X.Y.Z · **Дата:** ГГГГ-ММ-ДД · **Вахта:** N
+    # (текущая точка: vX.Y.Z)». Прежний паттерн искал отдельную строку
+    # `- **Текущая точка: v...**`, которой в этом формате нет — правка молча
+    # не находила совпадения, и §0 отставал от VERSION (тот же класс дефекта,
+    # что PIT-148 уже чинил один раз в другом месте).
+    line_re = re.compile(
+        r"- \*\*Версия:\*\* [\d.]+ · \*\*Дата:\*\* \d{4}-\d{2}-\d{2} · "
+        r"\*\*Вахта:\*\* (\S+)([^\n]*)"
+    )
+    m = line_re.search(t)
+    if m:
+        vahta, rest = m.group(1), m.group(2)
+        rest = re.sub(r"текущая точка: v[\d.]+", f"текущая точка: v{version}", rest)
+        new_line = (f"- **Версия:** {version} · **Дата:** {date.today().isoformat()} "
+                    f"· **Вахта:** {vahta}{rest}")
+        t = t[:m.start()] + new_line + t[m.end():]
+    else:
+        print("  ! строка §0 «Где стоим» не найдена по канону — версия там не обновлена",
+              file=sys.stderr)
     anchor = "## §3. Последние 10 изменений (новое сверху; ровно 10)\n"
     if anchor not in t:
         print("  ! §3 не найден — журнал не тронут", file=sys.stderr)
@@ -210,7 +227,7 @@ def main() -> int:
     # `ADR-004` §5 правило 1: раздача повторяется раз в несколько батчей, иначе
     # либо зеркала отстают, либо ритуал дорожает вдвое.
     try:
-        repos = Path.home() / "Documents" / "система_репозиториев"
+        repos = REPO.parent
         cn = int(new.split(".")[1])
         lag = 0
         for d in repos.iterdir():
@@ -221,7 +238,7 @@ def main() -> int:
                     lag += 1
         if lag:
             print(f"\n  🔴 зеркал отстало больше чем на 5 минорных: {lag}")
-            print("     Раздать:  LOCAL=1 bash ~/Documents/система_репозиториев/"
+            print(f"     Раздать:  LOCAL=1 bash {REPO.parent}/"
                   "mission-control/scripts/sync-base.sh")
     except Exception:
         pass

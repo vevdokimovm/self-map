@@ -113,6 +113,7 @@ python3 scripts/revision_check.py          # обязан дать CLEAN
 VERSION поднята + секция в CHANGELOG.md    # с блоком ### Campaign, если кампания сдвинулась
 WATCHLOG.md §0 и §3 обновлены              # §3 ровно 10 записей, лишнее подрезать
 python3 scripts/pack_release.py            # архив в ~/Downloads. 🔴 СТАРЫЕ НЕ УДАЛЯТЬ
+06-autonomous-mode-kit/bin/auto_log.py --repo ИМЯ --type batch --note "vX.Y.Z: title"
 ScheduleWakeup(...)                        # ← переставить сторожа
 ```
 
@@ -222,7 +223,7 @@ ScheduleWakeup(...)                        # ← переставить стор
 вызовами инструментов**, выдать строку и **продолжить работу не останавливаясь**:
 
 ```
-! ~/Documents/base-repo/06-autonomous-mode-kit/bin/night.sh
+! ~/repos/base-repo/06-autonomous-mode-kit/bin/night.sh
 ```
 
 Бриф ночной контур возьмёт из `06-autonomous-mode-kit/runs/NIGHT-RUN-BRIEF.md` (внутри
@@ -306,7 +307,8 @@ ScheduleWakeup(...)                        # ← переставить стор
 
 1. строка в `decisions.md`: **что пропущено · почему · на какой попытке · как чинить**;
 2. строка в `TASKS.md`, если пропуск требует владельца;
-3. **следующий шаг начинается немедленно** — залипший не повторяется в этом заходе.
+3. `06-autonomous-mode-kit/bin/auto_log.py --repo ИМЯ --type skip --note "..."`;
+4. **следующий шаг начинается немедленно** — залипший не повторяется в этом заходе.
 
 **Отличать «не вышло» от «не пробовал»** (`71` §7ж): в записи приводится **конкретный вывод**,
 который вернул отказ. Нет вывода — нет отказа, это была догадка, и шаг пропускать рано.

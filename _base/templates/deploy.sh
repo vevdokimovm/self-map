@@ -64,7 +64,7 @@
 #   OWNER=...      владелец (по умолчанию vevdokimovm)
 #   BRANCH=...     ветка (по умолчанию main)
 #   BASE_REPO=...  путь к клону base-repo для авто-обновления repos-map
-#                  (по умолчанию ищется рядом: ./base-repo, ~/base-repo, ~/Documents/base-repo)
+#                  (по умолчанию ищется рядом: ./base-repo, ~/base-repo, ~/repos/base-repo)
 #
 # ИМЕНА АРХИВОВ (понимает все три конвенции):
 #   <repo>-vX_Y_Z.zip · <repo>_vX.Y.Z.zip · <repo>-vX.Y.Z.zip
@@ -1729,7 +1729,7 @@ if [ -n "$NEW_REPOS" ]; then
   # ВАЖНО: только ПОСТОЯННЫЕ клоны. $WORK/base-repo сюда не годится — он удаляется
   # в конце прогона, и правка карты исчезнет вместе с ним (баг, пойманный на боевом тесте).
   for cand in "${BASE_REPO:-}" "$DIR/base-repo" "./base-repo" "$HOME/base-repo" \
-              "$HOME/Documents/base-repo" "$HOME/Documents/GitHub/base-repo"; do
+              "$HOME/repos/base-repo" "$HOME/Documents/base-repo" "$HOME/Documents/GitHub/base-repo"; do
     [ -n "$cand" ] && [ -f "$cand/repos-map.md" ] && { MAP="$(cd "$cand" && pwd)"; break; }
   done
   case "$MAP" in "$WORK"*) MAP="";; esac

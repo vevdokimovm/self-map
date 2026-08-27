@@ -8,7 +8,7 @@
 состояния default-ветки, всегда актуальный на момент запроса.
 
 Использование:
-    python3 scripts/sync_repos_zip.py [--owner vevdokimovm] [--dest ~/Documents/система_репозиториев]
+    python3 scripts/sync_repos_zip.py [--owner vevdokimovm] [--dest ~/repos]
     python3 scripts/sync_repos_zip.py --only base-repo,finpilot   # только выбранные
 
 Требует авторизованный `gh` (gh auth status) — используется для списка репозиториев
@@ -97,7 +97,7 @@ def main() -> None:
     parser.add_argument("--owner", default="vevdokimovm")
     parser.add_argument(
         "--dest",
-        default=str(Path.home() / "Documents" / "система_репозиториев"),
+        default=str(Path(__file__).resolve().parent.parent.parent),
     )
     parser.add_argument(
         "--only",

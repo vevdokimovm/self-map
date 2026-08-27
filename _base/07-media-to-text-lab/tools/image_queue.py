@@ -30,7 +30,8 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-REPOS = Path.home() / "Documents" / "система_репозиториев"
+BASE_REPO = Path(__file__).resolve().parent.parent.parent
+REPOS = BASE_REPO.parent
 SKIP_PARTS = {"_base", ".git", "node_modules", ".venv", "__pycache__",
               "build", "dist", "assets", "static", "public", ".next"}
 IMG = {".jpg", ".jpeg", ".png", ".heic", ".tiff", ".tif", ".webp"}

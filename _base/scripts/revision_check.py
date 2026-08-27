@@ -296,7 +296,7 @@ def check_watchlog(root: Path) -> list[str]:
     (04-watchlog-protocol.md).
     """
     version_file = root / "VERSION"
-    watchlog = root / "00-infrastructure" / "WATCHLOG.md"
+    watchlog = root / "WATCHLOG.md"
     if not version_file.is_file() or not watchlog.is_file():
         return []
 
@@ -341,7 +341,7 @@ def check_resume_point_content(root: Path) -> list[str]:
     """
     import re
 
-    watchlog = root / "00-infrastructure" / "WATCHLOG.md"
+    watchlog = root / "WATCHLOG.md"
     version_file = root / "VERSION"
     if not watchlog.is_file():
         return []
@@ -424,7 +424,7 @@ def check_living_documents(root: Path) -> list[str]:
         if (root / "VERSION").is_file() else None
 
     # --- 1. §3 журнала: ровно 10 записей -------------------------------------
-    watchlog = root / "00-infrastructure" / "WATCHLOG.md"
+    watchlog = root / "WATCHLOG.md"
     if watchlog.is_file():
         text = watchlog.read_text(encoding="utf-8")
         m = re.search(r"^## §3\..*?(?=^## §4\.)", text, re.M | re.S)
@@ -1168,7 +1168,7 @@ def main() -> int:
         print("[FAIL] Точка входа в вахту отстала (PIT-094)")
         for line in wl_problems:
             print(f"    · {line}")
-    elif (root / "00-infrastructure" / "WATCHLOG.md").is_file():
+    elif (root / "WATCHLOG.md").is_file():
         print(f"[OK] WATCHLOG §0 совпадает с VERSION "
               f"({(root / 'VERSION').read_text(encoding='utf-8').strip()})")
 

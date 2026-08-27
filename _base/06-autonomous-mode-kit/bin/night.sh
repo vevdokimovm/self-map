@@ -2,7 +2,7 @@
 # =============================================================================
 # night.sh — «ушёл спать» одной командой.
 #
-#   ~/Documents/base-repo/06-autonomous-mode-kit/bin/night.sh
+#   ~/repos/base-repo/06-autonomous-mode-kit/bin/night.sh
 #
 # Что делает сверх autonomous_loop.sh — то, что иначе владелец делает руками
 # и однажды забудет:
