@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -52,16 +53,38 @@ JUNK_NAMES = {".DS_Store", "Thumbs.db"}
 # То же дерево, что раньше раздавал sync-base.sh LOCAL=1 (ADR-004 §1) — весь канон
 # base-repo кроме собственно приватного маркера ротации (.repo-id репе не нужен,
 # у неё свой) и уже отдельно копируемых top-level служебных файлов, идущих как есть.
-DISTRIBUTE = (
-    "00-infrastructure", "00-manifest-aot", "01-claude-context",
-    "02-methodology-library", "03-role-kit", "04-product-dev-kit",
-    "05-infra-synthesis-lab", "06-autonomous-mode-kit", "07-media-to-text-lab",
-    "reports", "scripts", "templates", "tests", ".claude", ".githooks",
+# 🔴 28.08.2026: перечисление каталогов `NN-*` ЗАМЕНЕНО правилом.
+# Список отстал дважды и молча: `08-systems-theory-lab` (заведён 22.08) и
+# `09-automation-kit` (28.08) в него не попали — то есть новый кит физически
+# не доезжал до реп, хотя `BASE_VERSION` бодро показывал свежую версию.
+# Обнаружено гейтом: `_base/README.md` ссылался на `./09-automation-kit`,
+# которого рядом нет.
+# Это ровно `PIT-097` («список — намерение, свойство объекта — факт»):
+# признак «это кит базы» — имя вида `NN-...`, а не членство в списке,
+# который надо не забыть дополнить. Файлы по-прежнему перечислены явно:
+# у них нет общего свойства, по которому их можно отобрать.
+DISTRIBUTE_FILES = (
+    ".claude", ".githooks", "reports", "scripts", "templates", "tests",
     "00-CLAUDE-STOP.md", "00-MANIFEST.md", "00-MANIFEST-attack-on-titan.md",
     "CHANGELOG.md", "README.md", "ROADMAP.md", "TASKS.md", "START-HERE.md",
     "DO-NOT-EDIT.md", "repos-map.md", "repos-map-CHANGELOG.md",
     ".gitignore", ".repo-class",
 )
+
+
+def _distribute() -> tuple[str, ...]:
+    r"""Что раздаётся: все каталоги-киты `NN-*` + явный список файлов.
+
+    Каталог-кит опознаётся по имени (`\d\d-`), а не по списку — иначе каждый
+    новый кит нужно не забыть вписать, и его отсутствие видно только тогда,
+    когда что-то на него сошлётся.
+    """
+    kits = sorted(d.name for d in BASE_REPO.iterdir()
+                  if d.is_dir() and re.match(r"^\d\d-", d.name))
+    return tuple(kits) + DISTRIBUTE_FILES
+
+
+DISTRIBUTE = _distribute()
 
 
 def _copytree_clean(src: Path, dst: Path) -> None:
@@ -166,7 +189,28 @@ def main() -> int:
             continue
         old, verdict = sync_one(repo, canon_version, a.check)
         print(f"  {repo.name:<26} {old:<10} {verdict}")
+
+    if a.all and not a.check:
+        _record_liveness(f"канон v{canon_version}, {len(targets)} реп")
     return 0
+
+
+def _record_liveness(summary: str) -> None:
+    """Признак живости (`08-automation-triggers.md`) — не тихая автоматизация."""
+    import datetime
+    import re
+
+    path = BASE_REPO / "reports" / "infra-liveness.md"
+    if not path.is_file():
+        return
+    today = datetime.date.today().isoformat()
+    text = path.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"(\| `scripts/sync_base_local\.py --all` \| )[^|]+( \| )[^|]+( \|)"
+    )
+    new_text, n = pattern.subn(rf"\g<1>{today}\g<2>{summary}\g<3>", text)
+    if n:
+        path.write_text(new_text, encoding="utf-8")
 
 
 if __name__ == "__main__":

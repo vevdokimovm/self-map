@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Периодическая (не непрерывная) проверка — не путать с
+  com.vasyaevdokimov.claude-autonomous.plist (тот держит живым долгий прогон
+  по мандату; этот будит раз в неделю дешёвый скрипт, который сам решает,
+  нужен ли вообще настоящий вызов Claude). `51-autonomous-agent-loop.md` §9.
+
+  ЗАГРУЗКА:
+    cp com.vasyaevdokimov.infra-liveness.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.vasyaevdokimov.infra-liveness.plist
+  ВЫГРУЗКА:
+    launchctl unload ~/Library/LaunchAgents/com.vasyaevdokimov.infra-liveness.plist
+  ПРОВЕРИТЬ, ЧТО ЖИВ:
+    launchctl list | grep infra-liveness
+  ЛОГИ:
+    /tmp/infra-liveness-check.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.vasyaevdokimov.infra-liveness</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/vasyaevdokimov/repos/base-repo/06-autonomous-mode-kit/bin/infra_liveness_check.sh</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/vasyaevdokimov/.local/bin</string>
+    </dict>
+
+    <!-- Раз в неделю, понедельник 10:00 — не непрерывно, launchd переживёт закрытие
+         крышки (§6а: cron бы тихо пропустил запуск во время сна, launchd догонит
+         после пробуждения). Скрипт сам решает, дорос ли до реального вызова Claude. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/infra-liveness-launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/infra-liveness-launchd.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/vasyaevdokimov/repos/base-repo</string>
+</dict>
+</plist>

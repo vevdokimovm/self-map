@@ -86,7 +86,28 @@ def main() -> int:
         print(f"  [{len(entries)} репов] {entries[0][1]}")
         print(f"    → {repos_list}\n")
 
+    if not a.csv:
+        biggest = len(multi[0][1]) if multi else 0
+        _record_liveness(f"{biggest} реп в крупнейшей группе, {len(multi)} групп")
     return 0
+
+
+def _record_liveness(summary: str) -> None:
+    """Признак живости (`08-automation-triggers.md`) — не тихая автоматизация."""
+    import datetime
+    import re
+
+    path = BASE_REPO / "reports" / "infra-liveness.md"
+    if not path.is_file():
+        return
+    today = datetime.date.today().isoformat()
+    text = path.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"(\| `scripts/owner_blockers\.py` \| )[^|]+( \| )[^|]+( \|)"
+    )
+    new_text, n = pattern.subn(rf"\g<1>{today}\g<2>{summary}\g<3>", text)
+    if n:
+        path.write_text(new_text, encoding="utf-8")
 
 
 if __name__ == "__main__":

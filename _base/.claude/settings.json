@@ -9,6 +9,15 @@
             "timeout": 60
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/task-hygiene.sh\"",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -18,6 +27,17 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-base-mirror.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/watch-identity.sh\"",
             "timeout": 10
           }
         ]

@@ -36,7 +36,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/vasyaevdokimov/Documents/base-repo/06-autonomous-mode-kit/bin/autonomous_loop.sh</string>
+        <string>/Users/vasyaevdokimov/repos/base-repo/06-autonomous-mode-kit/bin/autonomous_loop.sh</string>
         <string>--brief</string>
         <string>&lt;ПУТЬ-К-БРИФУ&gt;</string>
         <string>--hours</string>
@@ -73,6 +73,6 @@
     <string>/tmp/claude-autonomous.err.log</string>
 
     <key>WorkingDirectory</key>
-    <string>/Users/vasyaevdokimov/Documents/base-repo</string>
+    <string>/Users/vasyaevdokimov/repos/base-repo</string>
 </dict>
 </plist>

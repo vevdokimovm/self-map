@@ -246,8 +246,12 @@ D="$SANDBOX/t13"; mkdir -p "$D"
 make_zip "$D" "iota-repo" "1.0.0" dot
 make_zip "$D" "kappa-repo" "1.0.0" dot
 OUT="$(ONLY="iota-repo" run_deploy "$D")"
-assert_contains "ONLY: нужная репа взята" "$OUT" "iota-repo"
-assert_missing "ONLY: лишняя отсеяна" "$OUT" "kappa-repo"
+assert_contains "ONLY: нужная репа взята" "$OUT" "══ Репозиторий: iota-repo"
+# Не голая подстрока "kappa-repo": Шаг 1 сканирует и печатает в прогрессе ВСЕ
+# архивы папки ещё до применения ONLY (индексация не должна быть неполной из-за
+# фильтра, который относится к публикации, а не к обзору) — это легитимно
+# и не значит, что репа обработана. Проверяем именно обработку, как и SKIP ниже.
+assert_missing "ONLY: лишняя отсеяна" "$OUT" "══ Репозиторий: kappa-repo"
 OUT="$(SKIP="kappa-repo" run_deploy "$D")"
 assert_missing "SKIP: репа пропущена" "$OUT" "══ Репозиторий: kappa-repo"
 
@@ -1150,6 +1154,28 @@ case_ "H10" "Сообщение MISSING не звучит как блокер �
 _missing_msg="$(grep 'MISSING\*)' "$DEPLOY")"
 assert_contains "объясняет, что шаг 3 чинит регистрацию сам" "$_missing_msg" "Шаг 3 добавит строку-заглушку автоматически"
 assert_contains "называет то, что реально остаётся за человеком" "$_missing_msg" "содержательное описание"
+
+# =============================================================================
+case_ "I6" "CLONE_LOW_SPEED_LIMIT/TIME: применены к клону/пушу, публикацию не ломают (v4.21.0)"
+# Порог зависшей передачи (§7 SPEC) — на локальном bare-remote стенда транспорт
+# файловый, http.lowSpeedLimit/Time для него не значат ничего (git тихо игнорирует
+# HTTP-специфичный конфиг на другом транспорте), поэтому здесь проверяется не сам
+# обрыв (для этого нужен реальный медленный HTTP-сервер), а то, что флаги —
+# синтаксически корректный вызов git, который не роняет обычный прогон.
+assert_contains "клон получает -c http.lowSpeedLimit" "$(cat "$DEPLOY")" 'http.lowSpeedLimit=$CLONE_LOW_SPEED_LIMIT'
+assert_contains "клон получает -c http.lowSpeedTime"  "$(cat "$DEPLOY")" 'http.lowSpeedTime=$CLONE_LOW_SPEED_TIME'
+assert_contains "пуш ветки получает те же пороги" "$(cat "$DEPLOY")" 'pushb(){ git -c "http.lowSpeedLimit=$CLONE_LOW_SPEED_LIMIT"'
+assert_contains "пуш тегов получает те же пороги"  "$(cat "$DEPLOY")" 'pusht(){ git -c "http.lowSpeedLimit=$CLONE_LOW_SPEED_LIMIT"'
+
+D="$SANDBOX/t_i6"; mkdir -p "$D"
+make_zip "$D" "netlow-repo" "1.0.0" dot
+OUT="$(CLONE_LOW_SPEED_LIMIT=7 CLONE_LOW_SPEED_TIME=1 run_deploy "$D")"
+assert_contains "прогон с нестандартными порогами публикует репу" "$OUT" "репозиторий создан"
+git clone -q "$REMOTES/netlow-repo.git" "$SANDBOX/c_i6" 2>/dev/null
+assert_eq "дерево тега цело при переопределённых порогах" "$(tag_tree_version "$SANDBOX/c_i6" 1.0.0)" "1.0.0"
+# второй прогон (idempotent) — те же переменные не мешают штатному "тег есть, пропускаю"
+OUT2="$(CLONE_LOW_SPEED_LIMIT=7 CLONE_LOW_SPEED_TIME=1 run_deploy "$D")"
+assert_contains "повторный прогон с теми же порогами не плодит новых коммитов" "$OUT2" "тег есть, пропускаю"
 
 # =============================================================================
 printf '\n\033[1m── Покрытие по зонам\033[0m\n'

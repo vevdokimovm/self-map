@@ -90,10 +90,12 @@ log() {  # время · итерация · событие · код · дли�
 say() { printf '\033[96m%s\033[0m\n' "$*"; }   # только яркие коды: тёмные не видны
 
 BACKOFF="30 60 120 240 300"
-backoff_at() {   # bash 3.2 не знает массивов по-человечески — берём словом из строки
-  local i=$1 n=1
-  for v in $BACKOFF; do [ "$n" -eq "$i" ] && { echo "$v"; return; }; n=$((n+1)); done
-  echo 300
+backoff_at() {   # bash 3.2 не знает массивов по-человечески — берём словом из строки.
+  # `awk`, не `for v in $BACKOFF` — тот полагался на word splitting, которого
+  # zsh без setopt sh_word_split не делает (PIT-017, найдено check_shell_
+  # antipatterns.py 28.08.2026). awk с here-string безопасен в bash и zsh одинаково.
+  local i=$1
+  awk -v n="$i" '{ print (n>=1 && n<=NF) ? $n : 300 }' <<< "$BACKOFF"
 }
 
 say "прогон:  $RUN_DIR"

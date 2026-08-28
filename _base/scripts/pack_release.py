@@ -14,6 +14,7 @@ import datetime
 import hashlib
 import atexit
 import os
+import re
 import sys
 import time
 import zipfile
@@ -40,7 +41,15 @@ OUT_DIR = Path.home() / "Downloads"
 NAME = REPO.name
 
 JUNK_NAMES = {".DS_Store", "Thumbs.db"}
-JUNK_DIRS = {".git", "__MACOSX", "__pycache__", ".ipynb_checkpoints", ".pytest_cache"}
+# 🔴 `node_modules`/`dist`/`.venv` (найдено 27.08.2026, первый JS-проект внутри
+# репы — `family/web/`): упаковщик не читает `.gitignore`, и без явного списка
+# зависимости npm (тысячи файлов, сотни МБ) уехали бы в архив целиком — то же,
+# что `.git`/`__pycache__` уже решают для других экосистем. Правило то же:
+# сборочный/зависимостный мусор не публикуется, исходники — да.
+JUNK_DIRS = {
+    ".git", "__MACOSX", "__pycache__", ".ipynb_checkpoints", ".pytest_cache",
+    "node_modules", "dist", "build", ".venv", "venv", ".next", ".turbo",
+}
 
 
 def collect():
@@ -183,6 +192,21 @@ def main():
         print(f"!! нет служебных файлов в корне: {', '.join(missing)}")
         print("   деплойер не упадёт, но поведёт себя иначе — см. канон 43 §3а")
         sys.exit(1)
+
+    # 🔴 PIT-152: WATCHLOG.md правился ПОСЛЕ вызова pack_release.py — архив
+    # зафиксировал §0 ещё со старой версией, деплой поймал рассинхрон только на
+    # публикации и потребовал полной переупаковки. Дешевле поймать здесь, до того
+    # как секунды уйдут на zip: те же два формата строки §0, что revision_check.py
+    # (`**Версия:**`) и легаси base-repo (`текущая точка:`), см. PIT-148.
+    watchlog = REPO / "WATCHLOG.md"
+    if watchlog.is_file():
+        wl_text = watchlog.read_text(encoding="utf-8", errors="replace")
+        wl_found = re.findall(r"\*\*Версия:\*\*\s*v?(\d+\.\d+\.\d+)", wl_text) \
+            or re.findall(r"[Тт]екущая точка:\s*\**v?(\d+\.\d+\.\d+)", wl_text)
+        if wl_found and wl_found[0] != version:
+            print(f"!! WATCHLOG §0 говорит v{wl_found[0]}, а VERSION — {version} (PIT-152)")
+            print("   поправь WATCHLOG.md §0 ДО упаковки — иначе архив зафиксирует старую точку входа")
+            sys.exit(1)
 
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
         for p in files:

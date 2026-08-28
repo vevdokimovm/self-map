@@ -44,16 +44,45 @@ SCRIPT = "templates/deploy.sh"
 CHANGELOG = "templates/deploy-CHANGELOG.md"
 SPEC = "templates/deploy-SPEC.md"
 
-# Копии, которые обязаны совпадать с каноном. Путь ~ разворачивается в домашний.
-KNOWN_COPIES = (
-    "~/Documents/mission-control/scripts/deploy.sh",
-    "~/Downloads/deploy.sh",
-)
+# 🔴 28.08.2026: СПИСОК копий заменён ПОИСКОМ по диску (`PIT-097`).
+# Прежний список из двух путей защищал **1 копию из 4**: один путь давно не
+# существовал (миграция), а две живые копии — `portrait-of-taste/templates/`
+# и `personal-finance-dss/deploy/publish/` — в него никто не вписал, и гейт
+# их не видел вовсе. Это тот же дефект, что нашёлся в тот же день в раздаче
+# базы: список — намерение, свойство объекта — факт.
+#
+# Признак копии: файл называется `deploy.sh` и лежит вне канона. Ищем там,
+# где они реально заводятся, не сканируя весь диск.
+SEARCH_ROOTS = ("~/repos", "~/Downloads", "~/Documents")
+
+
+def find_copies(canon: Path) -> list[Path]:
+    """Все `deploy.sh` на диске, кроме самого канона и раздач `_base/`.
+
+    `_base/` исключён намеренно: это копия базы целиком, она обязана отставать
+    между раздачами и не является самостоятельной копией деплойера.
+    """
+    seen: dict[str, Path] = {}
+    for root in SEARCH_ROOTS:
+        base = Path(root).expanduser()
+        if not base.is_dir():
+            continue
+        for p in base.rglob("deploy.sh"):
+            if "_base" in p.parts or p.resolve() == canon.resolve():
+                continue
+            seen.setdefault(str(p.resolve()), p)
+    return sorted(seen.values())
 
 # История не переписывается: в журналах и отчётах старые номера версий законны.
+# 🔴 Найдено 27.08.2026: список защищал только один runs/-каталог из нескольких
+# одного класса — `07-media-to-text-lab/runs/` не был в списке и ловился гейтом
+# как дрейф за упоминание версии deploy.sh на момент того захода. Тот же паттерн,
+# что 87-file-to-repo-routing.md §4 п.3 — правка одного места без grep по остальным.
 FROZEN_PREFIXES = (
     "reports/",
     "05-infra-synthesis-lab/runs/",
+    "06-autonomous-mode-kit/runs/",
+    "07-media-to-text-lab/runs/",
     "templates/_archive/",
     "templates/deploy-CHANGELOG.md",
     "CHANGELOG.md",
@@ -148,11 +177,8 @@ def check_copies(script: Path, canon: str) -> tuple[list[str], list[str]]:
     fails: list[str] = []
     notes: list[str] = []
     canon_sum = sha256(script)
-    for raw in KNOWN_COPIES:
-        path = Path(raw).expanduser()
-        if not path.is_file():
-            notes.append(f"копии нет на диске (это нормально): {raw}")
-            continue
+    for path in find_copies(script):
+        raw = str(path)
         if sha256(path) == canon_sum:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -209,9 +235,9 @@ def sync_copies(script: Path, canon: str) -> tuple[list[str], list[str]]:
     refused: list[str] = []
     payload = script.read_bytes()
     canon_sum = sha256(script)
-    for raw in KNOWN_COPIES:
-        path = Path(raw).expanduser()
-        if not path.is_file() or sha256(path) == canon_sum:
+    for path in find_copies(script):
+        raw = str(path)
+        if sha256(path) == canon_sum:
             continue
         found = VERSION_RE.search(path.read_text(encoding="utf-8", errors="replace"))
         their = found.group(1) if found else None

@@ -193,7 +193,71 @@ def check(root: Path, staged_mode: bool) -> list[str]:
     return problems
 
 
-def fix(root: Path) -> int:
+def changelog_summary(root: Path) -> str | None:
+    """Тезис верхней секции CHANGELOG — заготовка описания для нового блока.
+
+    Формат секции: `## [1.2.3] — 2026-08-28 — Тезис (MINOR)`. Берём тезис,
+    отрезая версию, дату и хвост `(MAJOR|MINOR|PATCH)`. Это НЕ окончательный
+    текст — вахта обязана его перечитать; но пустой плейсхолдер, который никто
+    не заполняет, хуже честной заготовки из соседнего файла.
+    """
+    text = read_text(root, "CHANGELOG.md")
+    if not text:
+        return None
+    for line in text.splitlines():
+        m = re.match(r"^##\s*\[[^\]]+\]\s*[—-]\s*\d{4}-\d{2}-\d{2}\s*[—-]\s*(.+?)\s*$", line)
+        if m:
+            return re.sub(r"\s*\((?:MAJOR|MINOR|PATCH)\)\s*$", "", m.group(1)).strip()
+    return None
+
+
+def insert_status_block(root: Path, version: str, today: str) -> int:
+    """Создать блок статуса в README, которого его нет.
+
+    🔴 Заведено 28.08.2026: замер по диску показал **58 реп из 63 без блока**.
+    Прежняя редакция `--fix` в этом случае печатала «вставь вручную» и выходила
+    с кодом 1 — то есть для 92 % системы инструмент не работал вовсе, а гейт
+    исправно жаловался на каждую. Автоматизировать было нечего только на бумаге:
+    и версия, и дата, и заготовка описания берутся из файлов самой репы.
+    """
+    readme_text = read_text(root, README) or ""
+    lines = readme_text.split("\n")
+    # Вставляем сразу после H1; если H1 нет — в самое начало.
+    idx = 0
+    for i, ln in enumerate(lines[:10]):
+        if ln.startswith("# "):
+            idx = i + 1
+            break
+    summary = changelog_summary(root) or "<одна строка: что происходит прямо сейчас>"
+    # 🔴 Ссылаемся ТОЛЬКО на файлы, которые существуют. Первая редакция вписывала
+    # все три ссылки безусловно — и завела 23 битые ссылки на `TASKS.md` в репах,
+    # где такого файла нет (поймано тем же гейтом в тот же заход, 28.08.2026).
+    # Массовый инструмент обязан проверять предпосылку в КАЖДОЙ репе, а не
+    # исходить из того, что все устроены как та, на которой его писали.
+    nav = [
+        (f"Открытое — [`{n}`]({n})" if kind == "roadmap" else
+         f"на владельце — [`{n}`]({n})" if kind == "tasks" else
+         f"где стоим — [`{n}`]({n}) §0")
+        for kind, n in (("roadmap", "ROADMAP.md"), ("tasks", "TASKS.md"),
+                        ("watchlog", "WATCHLOG.md"))
+        if (root / n).is_file()
+    ]
+    block = [
+        "",
+        OPEN_TAG,
+        f"> **Сейчас:** `v{version}` · {today} · {summary}",
+    ]
+    if nav:
+        block.append("> " + " · ".join(nav) + ".")
+    block.append(CLOSE_TAG)
+    lines[idx:idx] = block
+    (root / README).write_text("\n".join(lines), encoding="utf-8")
+    src = "из CHANGELOG" if changelog_summary(root) else "ПЛЕЙСХОЛДЕР — переписать"
+    print(f"создан блок статуса: v{version} · {today} · описание {src}")
+    return 0
+
+
+def fix(root: Path, create: bool = False) -> int:
     """Проставить версию и дату. Описание остаётся на человеке."""
     version_text = read_text(root, VERSION_FILE)
     readme_text = read_text(root, README)
@@ -206,7 +270,10 @@ def fix(root: Path) -> int:
     status = parse_status(readme_text)
 
     if status is None:
-        print(f"в {README} нет блока статуса — вставь вручную после заголовка:\n")
+        if create:
+            return insert_status_block(root, version, today)
+        print(f"в {README} нет блока статуса — вставь вручную "
+              f"(или прогони с --create):\n")
         print(TEMPLATE.format(version=version, date=today))
         return 1
 
@@ -225,6 +292,74 @@ def fix(root: Path) -> int:
     return 0
 
 
+def selftest() -> int:
+    """Канарейка `--create`: блок реально появляется и реально разбирается.
+
+    Проверяется ВЫВОД (файл после правки парсится обратно `parse_status()`),
+    а не факт, что функция не упала (`PIT-016`). Работает на временной репе,
+    настоящие файлы не трогает.
+    """
+    import tempfile
+
+    bad = []
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td).resolve()
+
+        # сценарий 1: есть CHANGELOG канонического формата — описание берётся оттуда
+        (root / "VERSION").write_text("2.3.4\n", encoding="utf-8")
+        (root / "README.md").write_text("# demo\n\nтекст репы\n", encoding="utf-8")
+        (root / "CHANGELOG.md").write_text(
+            "# CHANGELOG\n\n## [2.3.4] — 2026-08-28 — Живой тезис релиза (MINOR)\n\nтело\n",
+            encoding="utf-8")
+        fix(root, create=True)
+        text = (root / "README.md").read_text(encoding="utf-8")
+        st = parse_status(text)
+        if st is None:
+            bad.append("блок создан, но обратно не разбирается parse_status()")
+        else:
+            if st.version != "2.3.4":
+                bad.append(f"версия в блоке {st.version!r}, ожидалась '2.3.4'")
+            if "Живой тезис релиза" not in text:
+                bad.append("описание не подхватилось из CHANGELOG")
+            if "(MINOR)" in text:
+                bad.append("хвост (MINOR) не отрезан от тезиса")
+        if text.index(OPEN_TAG) < text.index("# demo"):
+            bad.append("блок вставлен ДО заголовка H1, а не после")
+        # ссылка только на существующие файлы: здесь нет ни ROADMAP, ни TASKS,
+        # ни WATCHLOG — значит навигационной строки быть не должно вовсе
+        for absent in ("ROADMAP.md", "TASKS.md", "WATCHLOG.md"):
+            if f"]({absent})" in text:
+                bad.append(f"ссылка на несуществующий {absent} — битая ссылка в README")
+
+        # сценарий 2: CHANGELOG в чужом формате — честный плейсхолдер, не выдумка
+        root2 = root / "other"
+        root2.mkdir()
+        (root2 / "VERSION").write_text("1.0.0\n", encoding="utf-8")
+        (root2 / "README.md").write_text("# other\n", encoding="utf-8")
+        (root2 / "CHANGELOG.md").write_text(
+            "# CHANGELOG\n\n## v1.0.0 — 2026-08-26\n\nтело без тезиса\n", encoding="utf-8")
+        fix(root2, create=True)
+        t2 = (root2 / "README.md").read_text(encoding="utf-8")
+        if "одна строка" not in t2:
+            bad.append("чужой формат CHANGELOG: ожидался плейсхолдер, а не выдуманный тезис")
+
+        # сценарий 3: блок уже есть — --create не должен его дублировать
+        before = t2.count(OPEN_TAG)
+        fix(root2, create=True)
+        after = (root2 / "README.md").read_text(encoding="utf-8").count(OPEN_TAG)
+        if after != before:
+            bad.append(f"повторный --create задублировал блок: {before} → {after}")
+
+    if bad:
+        print("selftest FAIL:")
+        for b in bad:
+            print("  ·", b)
+        return 1
+    print("selftest OK: блок создаётся и разбирается, описание берётся из CHANGELOG, "
+          "чужой формат даёт честный плейсхолдер, повтор не дублирует")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fix", action="store_true",
@@ -232,11 +367,19 @@ def main() -> int:
     parser.add_argument("--staged", action="store_true",
                         help="режим pre-commit: сверяться с индексом git")
     parser.add_argument("--root", default=".", help="корень репы (по умолчанию текущий)")
+    parser.add_argument("--create", action="store_true",
+                        help="создать блок статуса, если его нет "
+                             "(описание — заготовка из верхней секции CHANGELOG)")
+    parser.add_argument("--selftest", action="store_true",
+                        help="канарейка режима --create на временной репе")
     args = parser.parse_args()
 
+    if args.selftest:
+        return selftest()
+
     root = Path(args.root).resolve()
-    if args.fix:
-        return fix(root)
+    if args.fix or args.create:
+        return fix(root, create=args.create)
 
     problems = check(root, staged_mode=args.staged)
     if not problems:

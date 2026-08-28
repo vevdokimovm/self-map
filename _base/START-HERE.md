@@ -38,7 +38,7 @@
 2. Возьми `templates/REPO_README_TEMPLATE.md` → заполни под конкретную репу →
    положи как корневой `README.md`. Возьми `templates/gitignore.template` → `.gitignore`.
 3. Возьми `00-infrastructure/03-watchlog-template.md` → скопируй в `WATCHLOG.md`,
-   впиши текущее состояние репы (аккаунты V/J/M/S уже прописаны). Возьми
+   впиши текущее состояние репы (аккаунты V/J/M/S/A уже прописаны). Возьми
    `templates/CHANGELOG_TEMPLATE.md` → `CHANGELOG.md` — подробная append-only летопись
    (`24-changelog-protocol.md`). Журнал + changelog — разные инструменты (снимок «где мы» vs история).
    Если у репы есть направление на несколько этапов — возьми `templates/ROADMAP_TEMPLATE.md` →
@@ -112,6 +112,7 @@
 | `00-infrastructure/63-ai-tools-landscape.md` | Карта ИИ-инструментов под задачу; где потолок каждого |
 | `00-infrastructure/64-claude-code-sandbox.md` | Локальная песочница для Claude Code — не переустанавливать каждый раз |
 | `05-infra-synthesis-lab/` | **Кит синтеза инфраструктур:** стандарт, чек-лист, грабли, журналы прогонов |
+| `09-automation-kit/` | **Кит автоматизации:** как правило становится механизмом. Пять типов (хук · гейт · канарейка · сторож · скилл), правило выбора между ними и реестр всего, что уже автоматизировано |
 | `00-CLAUDE-STOP.md` | 🔴 **Вход для Claude:** обрыв канала tool-call + секреты. Читать первым |
 | `.githooks/pre-commit` | Хук: не пускает в коммит секреты, тяжёлые бинарники, `.zip`/`.docx` |
 | `01-claude-context/` | **Единый кит контекста** для всех аккаунтов Claude (вход — `00-navigator.md`) |
