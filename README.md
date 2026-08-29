@@ -1,7 +1,7 @@
 # self-map
 
 <!-- STATUS -->
-> **Сейчас:** `v1.12.2` · 2026-08-29 · Битые ссылки починены по существу
+> **Сейчас:** `v1.12.3` · 2026-08-29 · Гейт CLEAN: точка входа обрезана до текущего, стадии конвейера пронумерованы
 > Открытое — [`ROADMAP.md`](ROADMAP.md) · где стоим — [`WATCHLOG.md`](WATCHLOG.md) §0.
 <!-- /STATUS -->
 
@@ -16,18 +16,18 @@
 <!-- STRUCTURE:AUTO:START -->
 | Папка | Файлов | Что внутри |
 |---|---|---|
-| `00-infrastructure/` | 1 | TODO — заполнить вручную |
-| `01-psychological-profile/` | 23 | TODO — заполнить вручную |
-| `02-clinical/` | 31 | TODO — заполнить вручную |
-| `03-competency-reports-rsv/` | 14 | TODO — заполнить вручную |
-| `04-genetics-genotek/` | 8 | TODO — заполнить вручную |
-| `05-faith/` | 5 | TODO — заполнить вручную |
-| `06-diaries/` | 349 | TODO — заполнить вручную |
-| `07-self-reflection/` | 116 | TODO — заполнить вручную |
-| `08-feedback/` | 15 | TODO — заполнить вручную |
-| `09-session-summaries/` | 2 | TODO — заполнить вручную |
-| `10-life-history/` | 95 | TODO — заполнить вручную |
-| `11-external-sources/` | 5 | TODO — заполнить вручную |
-| `99-misc/` | 14 | TODO — заполнить вручную |
-| `reports/` | 1 | TODO — заполнить вручную |
+| `00-infrastructure/` | 1 | как устроена и ведётся эта репа |
+| `01-psychological-profile/` | 23 | 15 заметок, 8 документов Word |
+| `02-clinical/` | 31 | 25 заметок, 4 PDF, 2 документа Word |
+| `03-competency-reports-rsv/` | 14 | 7 заметок, 7 PDF |
+| `04-genetics-genotek/` | 8 | 7 заметок, 1 PDF |
+| `05-faith/` | 5 | 2 PDF, 2 заметки, 1 скрипт Python |
+| `06-diaries/` | 349 | 331 заметка, 8 PDF, 5 таблиц CSV, 2 подкаталога |
+| `07-self-reflection/` | 116 | 58 заметок, 33 документа Word, 20 PDF |
+| `08-feedback/` | 15 | 8 заметок, 6 PDF, 1 таблица CSV |
+| `09-session-summaries/` | 2 | 2 заметки |
+| `10-life-history/` | 96 | История жизни (анамнез) |
+| `11-external-sources/` | 5 | внешние источники |
+| `99-misc/` | 14 | 9 заметок, 3 документа Word, 2 PDF |
+| `reports/` | 1 | 1 таблица CSV |
 <!-- STRUCTURE:AUTO:END -->

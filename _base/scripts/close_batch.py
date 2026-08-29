@@ -85,14 +85,15 @@ def main() -> int:
         body = Path(a.body_file).read_text(encoding="utf-8")
 
     bump_flag = "--major" if a.major else "--minor" if a.minor else "--patch"
-    total = 4
+    total = 5
 
     if a.dry_run:
         print(f"ПЛАН для {a.repo} ({bump_flag}):")
         print("  1. revision_check.py --root … → обязан CLEAN")
-        print(f"  2. bump_repo.py {bump_flag} --title {a.title!r}")
-        print("  3. pack_release.py → архив в ~/Downloads")
-        print("  4. auto_log.py --type batch")
+        print("  2. gate_monitor.py → живы ли сами проверки (не блокирует)")
+        print(f"  3. bump_repo.py {bump_flag} --title {a.title!r}")
+        print("  4. pack_release.py → архив в ~/Downloads")
+        print("  5. auto_log.py --type batch")
         return 0
 
     # --- 1. гейт -------------------------------------------------------------
@@ -110,8 +111,28 @@ def main() -> int:
             print("   предсуществующее и это разобрано.")
             return 1
 
-    # --- 2. версия и живые документы ----------------------------------------
-    step(2, total, "версия · CHANGELOG · WATCHLOG · README")
+    # --- 1а. мета-гейт: живы ли сами проверки --------------------------------
+    # 🔴 Добавлено 29.08.2026. Зелёный гейт означает «ни одна проверка не
+    # сработала» — и это ровно то, что видно, когда проверки МЁРТВЫ. Различить
+    # «чисто» и «не проверялось» изнутри самого гейта нельзя; для этого нужен
+    # второй, внешний по отношению к нему инструмент (69 §4г: гейт был красным
+    # 41 день, 65 релизов, и никто не смотрел).
+    step(2, total, "мета-гейт: живы ли проверки")
+    rc, out = run(["python3", str(BASE_REPO / "scripts/gate_monitor.py"),
+                   "--root", str(repo)])
+    tail = [l for l in out.strip().split("\n") if l.startswith(("ИТОГ", "🔴", "[FAIL]"))]
+    print("  " + (tail[-1] if tail else "нет вывода"))
+    if "[FAIL]" in out:
+        # НЕ останавливаем батч: мёртвая проверка — дефект инфраструктуры,
+        # а не содержания, и чинить её посреди чужого батча значит смешивать
+        # два предмета. Но и молчать нельзя — иначе повторится тот же 41 день.
+        print("  ⚠ найдены мёртвые проверки — разобрать отдельным батчем базы")
+        for line in out.split("\n"):
+            if line.strip().startswith("·"):
+                print("    " + line.strip())
+
+    # --- 3. версия и живые документы -----------------------------------------
+    step(3, total, "версия · CHANGELOG · WATCHLOG · README")
     rc, out = run(["python3", str(BASE_REPO / "scripts/bump_repo.py"), a.repo,
                    bump_flag, "--title", a.title, "--body-stdin"], stdin_text=body)
     print("\n".join("  " + l for l in out.strip().split("\n")[:8]))
@@ -122,7 +143,7 @@ def main() -> int:
     new_version = (repo / "VERSION").read_text(encoding="utf-8").strip()
 
     # --- 3. архив ------------------------------------------------------------
-    step(3, total, "архив релиза")
+    step(4, total, "архив релиза")
     rc, out = run(["python3", str(BASE_REPO / "scripts/pack_release.py"), str(repo)])
     print("\n".join("  " + l for l in out.strip().split("\n")[-3:]))
     if rc != 0:
@@ -131,7 +152,7 @@ def main() -> int:
         return 1
 
     # --- 4. журнал прогона ---------------------------------------------------
-    step(4, total, "журнал авто-режима")
+    step(5, total, "журнал авто-режима")
     rc, out = run(["python3", str(BASE_REPO / "06-autonomous-mode-kit/bin/auto_log.py"),
                    "--repo", a.repo, "--type", "batch",
                    "--note", f"v{new_version}: {a.title}"])

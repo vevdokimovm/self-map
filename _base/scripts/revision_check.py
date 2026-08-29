@@ -119,6 +119,23 @@ def strip_code_fences(text: str) -> str:
     return "\n".join(kept)
 
 
+# Схема URI по RFC 3986 §3.1: буква, затем буквы/цифры/`+`/`-`/`.`, затем `:`.
+# Минимум две буквы — чтобы однобуквенный префикс (например, диск `C:`) не
+# проглатывался молча; в этой системе таких путей нет, но правило не должно
+# зависеть от того, что их нет.
+URI_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]+:")
+
+
+def selftest_uri_schemes() -> bool:
+    """Схема пропускается, ОТНОСИТЕЛЬНЫЙ путь — нет. Различение, а не исполнение."""
+    skip = ["data:image/png;base64,iVBOR", "https://example.org", "mailto:a@b.c",
+            "obsidian://open?vault=x", "tel:+70000000000"]
+    keep = ["docs/README.md", "./a.png", "../b/c.md", "docs/note: draft.md",
+            "assets/charts/x.png"]
+    return (all(URI_SCHEME_RE.match(t) for t in skip)
+            and not any(URI_SCHEME_RE.match(t) for t in keep))
+
+
 def check_links(root: Path, files: list[Path], allowlist: set[str]) -> tuple[list[str], int, int]:
     broken: list[str] = []
     checked = 0
@@ -166,7 +183,17 @@ def check_links(root: Path, files: list[Path], allowlist: set[str]) -> tuple[lis
         targets = MD_LINK_RE.findall(text) + IMG_LINK_RE.findall(text)
         for raw in targets:
             target = raw.split("#", 1)[0].strip()
-            if not target or target.startswith(("http://", "https://", "mailto:", "tel:")):
+            # 🔴 29.08.2026: список схем был ЗАХАРДКОЖЕН четырьмя штуками
+            # (`http`, `https`, `mailto`, `tel`) — и `data:` в него не входил.
+            # В `dota-dossier/docs/legacy/` лежат отчёты с ВСТРОЕННЫМИ картинками
+            # `![…](data:image/png;base64,…)`: **16 «битых ссылок»** на изображения,
+            # которые физически внутри файла и сломаться не могут в принципе.
+            # Правило вместо перечня: адрес со СХЕМОЙ (RFC 3986) — не путь в файловой
+            # системе, проверять его существованием файла бессмысленно, какая бы
+            # схема ни встретилась завтра (`obsidian:`, `zotero:`, `file:`).
+            # Двоеточие после `/` схемой не является — `docs/note: draft.md`
+            # регуляркой не захватывается и проверяется как обычный путь.
+            if not target or URI_SCHEME_RE.match(target):
                 continue
             if raw in allowlist or target in allowlist:
                 continue
@@ -254,25 +281,89 @@ def _is_cjk(ch: str) -> bool:
     return any(low <= code <= high for low, high in CJK_RANGES)
 
 
-def check_cjk(root: Path, files: list[Path]) -> list[str]:
-    """Иероглиф в тексте системы — почти всегда токен-слип, а не намерение."""
+def check_cjk(root: Path, files: list[Path],
+              allowlist: set[str] | None = None) -> list[str]:
+    """Иероглиф в тексте системы — почти всегда токен-слип, а не намерение.
+
+    🔴 «Почти» — не «всегда». Найдено 28–29.08.2026: в `dota-dossier` лежит
+    **легитимный китайско-русский глоссарий** терминов Dota под расшифровки
+    китайских про-игроков — 518 срабатываний на материале, где китайский
+    является предметом изучения. (Примеры иероглифов здесь намеренно НЕ
+    приводятся: эта же проверка поймала их в первой редакции комментария —
+    она не отличает пример от слипа, и правильно делает.) Исключение задаётся через
+    `.revision_allowlist` репы **тремя формами**, от грубой к точной:
+
+        knowledge/pro-thinking/     каталог целиком (корпус на языке-предмете)
+        docs/glossary-cn.md         один файл
+        cjk-term: <слово>           СЛОВАРНАЯ ЕДИНИЦА, разрешённая везде в репе
+
+    🔴 Третья форма — единственная, которая НЕ выключает проверку. Найдено
+    29.08.2026: в `dota-dossier` китайские термины цитируются в `CHANGELOG.md`
+    и `ROADMAP.md` — живых документах, куда слипы как раз и попадают. Исключить
+    файл целиком значило бы ослепить канарейку ровно там, где она нужнее всего,
+    и это не теория: в том же прогоне в двух файлах `coaching/` нашлись **живые
+    слипы** — корейский слог внутри русского слова и китайский иероглиф вместо
+    русского. Оба пролежали месяцами и были бы прощены исключением по файлу.
+
+    Разрешённый термин вырезается из строки ПЕРЕД поиском, поэтому любой другой
+    иероглиф в той же строке по-прежнему краснеет. Способность различать
+    проверяется канарейкой `selftest_cjk_terms`.
+
+    (Примеры иероглифов в этом комментарии намеренно НЕ приводятся: эта же
+    проверка поймала их в первой редакции — она не отличает пример от слипа,
+    и правильно делает.)
+    """
     hits = []
+    allow = allowlist or set()
+    terms = sorted(cjk_terms(allow), key=len, reverse=True)
     for path in files:
         if path.suffix.lower() not in CJK_TEXT_EXT:
             continue
         rel = path.relative_to(root).as_posix()
-        if rel in CJK_ALLOWLIST:
+        if rel in CJK_ALLOWLIST or rel in allow:
+            continue
+        if any(a.endswith("/") and rel.startswith(a) for a in allow):
             continue
         try:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError):
             continue
         for number, line in enumerate(text.splitlines(), 1):
+            for term in terms:
+                if term in line:
+                    line = line.replace(term, "")
             for ch in line:
                 if _is_cjk(ch):
                     hits.append(f"{rel}:{number}: U+{ord(ch):04X}")
                     break
     return hits
+
+
+CJK_TERM_PREFIX = "cjk-term:"
+
+
+def cjk_terms(allow: set[str]) -> set[str]:
+    """Словарные единицы из `.revision_allowlist` — форма `cjk-term: <слово>`."""
+    return {a[len(CJK_TERM_PREFIX):].strip() for a in allow
+            if a.startswith(CJK_TERM_PREFIX) and a[len(CJK_TERM_PREFIX):].strip()}
+
+
+def selftest_cjk_terms() -> bool:
+    """Разрешённый термин молчит, ЛЮБОЙ другой иероглиф в той же строке — нет.
+
+    Канарейка проверяет не «код исполняется», а способность РАЗЛИЧАТЬ: без
+    второй половины исключение по термину неотличимо от выключенной проверки.
+    """
+    import tempfile
+    term, alien = chr(0x5927) + chr(0x54E5), chr(0xCF54)
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "a.md").write_text(f"перевод {term} есть в глоссарии\n", encoding="utf-8")
+        (root / "b.md").write_text(f"нет{alien}д в русском слове\n", encoding="utf-8")
+        allow = {f"{CJK_TERM_PREFIX} {term}"}
+        files = [root / "a.md", root / "b.md"]
+        hits = check_cjk(root, files, allow)
+        return [h.split(":")[0] for h in hits] == ["b.md"]
 
 
 def selftest_cjk() -> bool:
@@ -812,7 +903,16 @@ def check_living_documents(root: Path) -> list[str]:
     # --- 2. CHANGELOG: секция текущей версии ---------------------------------
     changelog = root / "CHANGELOG.md"
     if version and changelog.is_file():
-        if f"[{version}]" not in changelog.read_text(encoding="utf-8"):
+        # 🔴 29.08.2026: проверка требовала ровно `[1.22.0]` — конвенцию
+        # Keep a Changelog — и валила `exam-kit`, который с 07.2026 ведёт
+        # журнал в столь же законной форме `## v1.22.0 — дата`. Секция там
+        # ЕСТЬ, а гейт сообщал «версия поднята без записи»: он проверял не
+        # наличие записи, а совпадение с одной из двух живых конвенций.
+        # Тот же класс, что перечень схем URI и дословные заголовки отчётов:
+        # проверять надо предмет, а не его оформление.
+        text = changelog.read_text(encoding="utf-8")
+        if f"[{version}]" not in text and not re.search(
+                rf"^#{{1,3}}\s+v?{re.escape(version)}\b", text, re.M):
             problems.append(
                 f"CHANGELOG.md не содержит секции [{version}] — "
                 f"версия поднята без записи (PIT-116)")
@@ -933,12 +1033,30 @@ SECTION_TOKEN = re.compile(r"^[0-9][0-9A-Za-zА-Яа-яЁё.\-]*\.?$")
 SECTION_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}\.?$")
 # Осознанные исключения: относительный путь -> причина. Каждая строка проверяется
 # на существование файла (selftest), чтобы исключение не пережило свой предмет.
-SECTION_DUPES_ALLOWLIST: dict[str, str] = {
-    "00-infrastructure/sborka-vse.md": "конкатенация 14 документов, нумерация источников сохранена намеренно",
-    "00-infrastructure/sborka-yadro-profil.md": "конкатенация ядра профиля, то же самое",
-    "01-claude-context/bundle-all.md": "англоязычная копия sborka-vse.md",
-    "01-claude-context/bundle-core-profile.md": "англоязычная копия sborka-yadro-profil.md",
-}
+# 🔴 29.08.2026: ПЕРЕЧЕНЬ ЗАМЕНЁН ПРАВИЛОМ. Здесь стоял жёсткий словарь из
+# четырёх путей base-repo, и у всех четырёх причина была ОДНА — «конкатенация
+# нескольких документов, нумерация источников сохранена намеренно». Перечень
+# закрывал ровно те файлы, которые кто-то однажды увидел: тот же самый
+# `СБОРКА_всё.md`, лежащий копией в `misc-vault`, краснел, потому что его путь
+# в словарь не попал. Признак конкатенации структурный, его незачем перечислять.
+#
+# ПРАВИЛО: **больше одного заголовка первого уровня = это сборка, а не документ.**
+# У обычного документа ровно один `# `. Повтор `## 1` в сборке неизбежен и
+# чинится только переписыванием чужих исходников — то есть не чинится.
+#
+# 🔴 Код-блоки вырезаются ДО подсчёта, и это не мелочь: `it-base/…/vk-graph/
+# README.md` несёт внутри примера строку `# Вставь токен в .env` — комментарий
+# bash, не заголовок. Без вырезания файл сошёл бы за сборку и **скрыл настоящий
+# дефект**: у него два разных `### 3` («Запуск через Docker» и «Запуск локально»),
+# и читатель, идущий по «шагу 3», попадает не туда. Правило обязано отличать
+# сборку от документа с реальным дефектом — это и проверяет канарейка.
+SECTION_DUPES_ALLOWLIST: dict[str, str] = {}
+
+
+def is_assembly(text: str) -> bool:
+    """Сборка нескольких документов в один файл — повторы нумерации неизбежны."""
+    body = strip_code_fences(text)
+    return sum(1 for line in body.splitlines() if line.startswith("# ")) > 1
 
 
 def check_section_dupes(root: Path, files: list[Path]) -> list[str]:
@@ -963,16 +1081,17 @@ def check_section_dupes(root: Path, files: list[Path]) -> list[str]:
             continue
         rel = path.relative_to(root)
         rel_posix = rel.as_posix()
-        # 🔴 Найдено 28.08.2026: в любой репе, кроме base-repo, эти же файлы лежат
-        # под `_base/` (раздача 1-в-1) — путь без префикса в списке не совпадал
-        # с `_base/00-infrastructure/sborka-vse.md`, и исключение работало только
-        # для самой базы. Тот же класс, что PIT-142 (копия видна под другим путём).
-        if is_frozen(rel) or rel_posix in SECTION_DUPES_ALLOWLIST or (
-            rel_posix.startswith("_base/")
-            and rel_posix[len("_base/"):] in SECTION_DUPES_ALLOWLIST
-        ):
+        if is_frozen(rel):
             continue
-        text = strip_code_fences(path.read_text(encoding="utf-8", errors="replace"))
+        raw = path.read_text(encoding="utf-8", errors="replace")
+        # Сборка нескольких документов — повторы нумерации в ней неизбежны
+        # и не чинятся. Признак структурный, не списочный: см. `is_assembly`.
+        # 🔴 Прежняя редакция вместо этого держала словарь из четырёх путей
+        # base-repo и не покрывала их же копии в других репах (`PIT-142`,
+        # «копия видна под другим путём»).
+        if is_assembly(raw):
+            continue
+        text = strip_code_fences(raw)
         seen: dict[tuple[int, str], int] = {}
         dupes: list[str] = []
         for line in text.splitlines():
@@ -1016,8 +1135,23 @@ def selftest_section_dupes() -> bool:
         good.write_text(good.read_text(encoding="utf-8")
                         + "## 2026-08-04 — запись\n## 2026-08-04 — вторая запись\n",
                         encoding="utf-8")
-        caught = check_section_dupes(root, [bad1, bad2, good])
-        return len(caught) == 2 and all("c.md" not in c for c in caught)
+        # 🔴 Половина канарейки, добавленная 29.08.2026 вместе с заменой
+        # перечня исключений правилом. Проверяются ОБЕ стороны различения:
+        # сборка (два `# `) прощается, а документ, где второй `# ` — это
+        # комментарий bash внутри код-блока, проверяется как обычный и
+        # свой настоящий дефект не прячет. Без второй половины правило
+        # неотличимо от «прощать всё, где есть решётка в тексте».
+        assembly = root / "d.md"
+        assembly.write_text("# Док один\n## 1. Раз\n\n# Док два\n## 1. Раз\n",
+                            encoding="utf-8")
+        fenced = root / "e.md"
+        fenced.write_text("# README\n### 3. Docker\n```bash\n"
+                          "# Вставь токен в .env\n```\n### 3. Локально\n",
+                          encoding="utf-8")
+        caught = check_section_dupes(root, [bad1, bad2, good, assembly, fenced])
+        names = {c.split(":")[0] for c in caught}
+        return (len(caught) == 3 and "c.md" not in names
+                and "d.md" not in names and "e.md" in names)
 
 
 # Числа, которые пишутся в прозе руками и потому устаревают молча (PIT-091).
@@ -1447,28 +1581,382 @@ def selftest_prose_counts() -> bool:
         return check_prose_counts(root) == []
 
 
+# Разделы, без которых отчёт исследования неотличим от эссе по памяти.
+# Заведено 29.08.2026 вместе с доводкой агента `researcher`: агент ОБЯЗАН
+# раскрывать процесс (тип запроса, число субагентов, что осталось неизвестным),
+# иначе читатель не может оценить, насколько выводам верить. Правило в промпте
+# агента — совет; проверка файла на диске — механизм.
+# 🔴 Проверяется СОДЕРЖАНИЕ раздела, а не его точная формулировка.
+# Первая редакция требовала дословных заголовков «Как это исследовалось» и
+# «Что осталось неизвестным» — и тут же покраснела на двух существующих
+# отчётах, где ровно эти разделы есть под именами «Как это делалось» и
+# «7. Что осталось неизвестным». Проверка на дословность ловит не отсутствие
+# раздела, а несовпадение слов, и лечится она переписыванием заголовка —
+# то есть учит подгонять формулировку под гейт вместо того, чтобы писать
+# отчёт. Тот же класс, что `PIT-159` (проза правилась под ложное срабатывание).
+RESEARCH_SECTIONS = (
+    ("раскрытие процесса", ("как это исследовал", "как это делалось",
+                            "как исследовал", "методика", "как это искалось")),
+    ("что осталось неизвестным", ("осталось неизвестн", "не выяснен",
+                                  "чего не знаем", "открытые вопрос")),
+)
+
+
+def check_research_reports(root: Path) -> list[str]:
+    """Отчёт исследования обязан раскрывать процесс, а не только результат.
+
+    🔴 Проверяется КАТАЛОГ `reports/research/`, а не всякий файл со словом
+    «исследование»: адрес — это обещание формата. Файл, положенный туда,
+    заявляет себя отчётом агента; конспект или заметка живут в другом месте.
+    """
+    folder = root / "reports" / "research"
+    if not folder.is_dir():
+        return []
+    problems = []
+    for path in sorted(folder.glob("*.md")):
+        if path.name in {"README.md", "TEMPLATE.md"}:
+            continue
+        # Структурный маркер — не только заголовок. Найдено 29.08.2026 на
+        # `agent-skill-plugin-sources-2026-08-28.md`: раскрытие процесса там
+        # есть и написано честно («реальных субагентов запущено 0 — в тулсете
+        # не было инструмента спавна»), но оформлено жирным зачином внутри
+        # раздела «Прямой ответ», а не своим заголовком. Требовать именно
+        # заголовок значило бы придираться к вёрстке при выполненном условии.
+        # Жирный зачин в начале строки — такой же блочный маркер markdown,
+        # а вот упоминание в середине абзаца — нет, и оно не засчитывается.
+        heads = []
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if line.startswith("#"):
+                heads.append(line.lstrip("#").strip().lower())
+            elif line.startswith("**"):
+                heads.append(line.split("**")[1].strip().lower() if "**" in line[2:] else "")
+        missing = [label for label, keys in RESEARCH_SECTIONS
+                   if not any(k in h for h in heads for k in keys)]
+        if missing:
+            rel = path.relative_to(root).as_posix()
+            problems.append(f"{rel}: отчёт не содержит — {', '.join(missing)} "
+                            f"(образец: templates/RESEARCH_REPORT_TEMPLATE.md)")
+    return problems
+
+
+def selftest_research_reports() -> bool:
+    """Ловит отчёт без раскрытия процесса; НЕ придирается к формулировке.
+
+    Вторая половина — та, ради которой канарейка и переписана: заголовок
+    с номером и синонимом обязан проходить, иначе проверка требует не
+    содержания, а конкретных слов.
+    """
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        folder = root / "reports" / "research"
+        folder.mkdir(parents=True)
+        (folder / "bad.md").write_text("# Тема\n\n## Находки\nтекст\n", encoding="utf-8")
+        if len(check_research_reports(root)) != 1:
+            return False
+        (folder / "bad.md").write_text(
+            "# Тема\n\n## Как это делалось\nтаблица\n"
+            "\n## 7. Что осталось неизвестным\nстрока\n", encoding="utf-8")
+        if check_research_reports(root) != []:
+            return False
+        # Жирный зачин засчитывается, упоминание в середине абзаца — нет.
+        (folder / "bad.md").write_text(
+            "# Тема\n\n**Как это делалось.** три поиска\n"
+            "\n**Что осталось неизвестным.** ничего\n", encoding="utf-8")
+        if check_research_reports(root) != []:
+            return False
+        (folder / "bad.md").write_text(
+            "# Тема\n\nВ тексте сказано как это делалось и что осталось "
+            "неизвестным, но структурно не выделено.\n", encoding="utf-8")
+        return len(check_research_reports(root)) == 1
+
+
+def check_secret_hygiene(root: Path) -> tuple[list[str], list[str]]:
+    """Секрет, лежащий в файле репы, — это секрет в архиве и в бэкапе.
+
+    🔴 Заведено 29.08.2026 вместе с решением по хранению
+    (`00-infrastructure/94-secret-storage.md`): канон — связка ключей macOS,
+    файл `.env` собирается из неё по требованию и живёт ровно столько, сколько
+    работает приложение. Проверка ловит два разных дефекта:
+
+      FAIL — `.env` есть, а правила `.env` в `.gitignore` НЕТ. Это прямой путь
+             секрета в историю, откуда он уже не удаляется, а только
+             отзывается у провайдера.
+      WARN — `.env` есть и в нём НЕПУСТОЕ значение секретного ключа. Файл
+             легитимен (его собирает `secret.py env`), но пока он лежит на
+             диске, он попадает в Time Machine и в любую ручную упаковку.
+             Правильнее `secret.py run <репа> -- команда`: файла не возникает
+             вовсе.
+
+    Классификация «секрет или настройка» берётся из `secret.py` — единственного
+    места, где она определена. Импорт не удался — проверка НЕ молчит: молчание
+    неотличимо от «всё чисто» (`71-fail-loud-and-sourcing.md` §7ж).
+    """
+    envs = []
+    for path in root.rglob(".env"):
+        if any(p in {"node_modules", ".venv", "venv", ".git", "_base"} for p in path.parts):
+            continue
+        if path.is_file():
+            envs.append(path)
+    if not envs:
+        return [], []
+
+    fails, warns = [], []
+    gitignore = (root / ".gitignore")
+    gi_text = gitignore.read_text(encoding="utf-8", errors="replace") if gitignore.is_file() else ""
+    if not re.search(r"^\s*\*?\.env\s*$", gi_text, re.M):
+        fails.append(f"есть .env, но в .gitignore нет правила `.env` "
+                     f"({len(envs)} файл(ов)) — секрет уедет в историю")
+
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from secret import is_secret_name, secret_names_for
+    except Exception as exc:
+        fails.append(f"проверка секретов не выполнена: не импортируется secret.py ({exc})")
+        return fails, warns
+
+    for env in envs:
+        rel = env.relative_to(root).as_posix()
+        # 🔴 Судить о живом `.env` правилом «пусто = секрет» НЕЛЬЗЯ: там всё
+        # заполнено по определению. Источник правды — соседний `.env.example`
+        # (он для того и коммитится); нет образца — грубый признак по имени.
+        declared = secret_names_for(env)
+        for line in env.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            name, _, value = line.partition("=")
+            name = name.strip()
+            if not value.strip():
+                continue
+            secret_here = name in declared if declared is not None else is_secret_name(name)
+            if secret_here:
+                warns.append(f"{rel}: `{name}` лежит значением в файле — "
+                             f"канон связка ключей (secret.py run/env)")
+    return fails, warns
+
+
+def selftest_secret_hygiene() -> bool:
+    """Ловит отсутствие правила и НЕ ругается на закрытую правилом репу."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / ".env").write_text("VK_TOKEN=abc123\nVAULT_ROOT=/x\n", encoding="utf-8")
+        open_fails, open_warns = check_secret_hygiene(root)
+        if not open_fails or not open_warns:
+            return False
+        (root / ".gitignore").write_text(".env\n", encoding="utf-8")
+        closed_fails, closed_warns = check_secret_hygiene(root)
+        # Правило закрыло FAIL, но значение в файле по-прежнему WARN —
+        # это разные дефекты, и второй не лечится первым.
+        return closed_fails == [] and len(closed_warns) == 1
+
+
+def selftest_changelog_conventions() -> bool:
+    """Обе живые конвенции журнала засчитываются, отсутствие записи — нет.
+
+    Третья половина обязательна: без неё «принимать обе» неотличимо от
+    «не проверять вовсе».
+    """
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "VERSION").write_text("1.22.0\n", encoding="utf-8")
+        (root / "WATCHLOG.md").write_text("## §0\nv1.22.0\n", encoding="utf-8")
+
+        def probe(body: str) -> bool:
+            (root / "CHANGELOG.md").write_text(body, encoding="utf-8")
+            return any("не содержит секции" in x for x in check_living_documents(root))
+
+        keep_a_changelog = probe("## [1.22.0] — 2026-08-29\nтекст\n")
+        v_prefixed = probe("## v1.22.0 — 2026-08-26\nтекст\n")
+        absent = probe("## v1.21.1 — 2026-07-23\nтекст\n")
+        return not keep_a_changelog and not v_prefixed and absent
+
+
+# Порог длины описания. Не эстетика: описание — ЕДИНСТВЕННОЕ, что модель
+# видит до загрузки тела правила (progressive disclosure, Anthropic «Agent
+# Skills», 16.10.2025). Решение «сработать или нет» принимается по нему, значит
+# правило с пустым или общим описанием **невидимо**, сколько бы хорошего ни было
+# написано внутри. Двадцать символов — не «хорошее описание», а нижняя граница,
+# ниже которой описания заведомо нет.
+DESCRIPTION_MIN = 20
+# Слова, по которым видно, что описание отвечает на «КОГДА это применять».
+# Описание, отвечающее только на «что это такое», не даёт основания сработать.
+TRIGGER_WORDS = ("когда", "если", "вызывать", "использовать", "применять",
+                 "на запрос", "при ", "нужен", "нужна", "нужно")
+
+
+def check_rule_descriptions(root: Path) -> list[str]:
+    """У скилла и агента обязано быть описание, называющее ПОВОД сработать.
+
+    🔴 Заведено 29.08.2026 по исследованию `reports/research/
+    system-building-and-analysis-2026-08-29.md` (кандидат №2). Механизм
+    прогрессивного раскрытия устроен так, что тело правила загружается ТОЛЬКО
+    если описание убедило. Пустое описание — это выключенное правило, и внешне
+    оно неотличимо от работающего: файл на месте, содержание отличное.
+
+    Проверяются два свойства, оба механические:
+      · описание есть и не короче `DESCRIPTION_MIN`;
+      · в нём есть слово-повод — «когда», «если», «вызывать», «при»…
+    Качество формулировки не проверяется: это суждение, и гейт его не выносит.
+    """
+    problems: list[str] = []
+    targets: list[Path] = []
+    targets += sorted(root.glob(".claude/skills/*/SKILL.md"))
+    targets += sorted(root.glob(".claude/agents/*.md"))
+    for path in targets:
+        rel = path.relative_to(root).as_posix()
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if not text.startswith("---"):
+            problems.append(f"{rel}: нет фронтматтера — описание негде объявить")
+            continue
+        head = text.split("---", 2)[1]
+        desc = ""
+        for line in head.splitlines():
+            if line.startswith("description:"):
+                desc = line[len("description:"):].strip().strip('"\'')
+                break
+        if len(desc) < DESCRIPTION_MIN:
+            problems.append(f"{rel}: описание пустое или короче {DESCRIPTION_MIN} "
+                            f"символов — правило невидимо до загрузки тела")
+        elif not any(w in desc.lower() for w in TRIGGER_WORDS):
+            problems.append(f"{rel}: описание не называет ПОВОД сработать "
+                            f"(«когда», «если», «вызывать»…) — модель не сможет "
+                            f"решить, применять ли правило")
+    return problems
+
+
+def selftest_rule_descriptions() -> bool:
+    """Ловит пустое описание и описание без повода; молчит на полном."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        d = root / ".claude" / "skills" / "x"
+        d.mkdir(parents=True)
+        f = d / "SKILL.md"
+
+        def probe(desc: str) -> int:
+            f.write_text(f"---\nname: x\ndescription: {desc}\n---\nтело\n",
+                         encoding="utf-8")
+            return len(check_rule_descriptions(root))
+
+        empty = probe("")
+        no_trigger = probe("Инструмент для разбора длинных документов системы")
+        good = probe("Вызывать, когда владелец просит разобрать длинный документ")
+        return empty == 1 and no_trigger == 1 and good == 0
+
+
+# Каталоги, которых в README быть не обязано: служебные, раздаваемые, скрытые.
+# `_base/` — копия базы, её состав объявлен в самой базе, а не у хозяина.
+REFLEXION_SKIP = {
+    "_base", "node_modules", "dist", "build", "venv", "reports",
+    "templates", "scripts", "tests", "assets", "cache", "tmp",
+    # Порождается инструментом, а не автором: объявлять в README нечего.
+    "__pycache__", "__MACOSX", "htmlcov", "site-packages", "egg-info",
+}
+
+
+def check_reflexion_model(root: Path) -> list[str]:
+    """Заявленная структура репы против фактической — reflexion model.
+
+    🔴 Заведено 29.08.2026 по исследованию `reports/research/
+    system-building-and-analysis-2026-08-29.md` (кандидат №1, ранг 1).
+    Метод: Murphy, Notkin, Sullivan, «Software Reflexion Models», FSE 1995 —
+    высокоуровневая модель, которую держит в голове автор, сверяется с моделью,
+    которую можно снять с артефакта, и **расхождение показывается явно**.
+
+    Для этой системы модель заявлена в таблице структуры `README.md`, факт —
+    в списке каталогов на диске. Ловится ровно одно, зато молчаливое: **каталог,
+    заведённый и не объявленный**. Он не ломает ни одной ссылки, не роняет ни
+    одной проверки — просто через месяц никто не помнит, что там и зачем, и это
+    первый шаг архитектурной эрозии.
+
+    🔴 Метод выбран **именно потому, что не требует истории коммитов** — у
+    рабочих реп нет `.git`, и все методы измерения деградации, завязанные на
+    `git blame`/`git log` (энтропия изменений Хассана, возраст SATD), для них
+    неопределены. Reflexion работает по одному срезу.
+
+    Обратное направление (объявлен, но не существует) уже ловят битые ссылки.
+    """
+    readme = root / "README.md"
+    if not readme.is_file():
+        return []
+    text = readme.read_text(encoding="utf-8", errors="replace")
+    actual = {d.name for d in root.iterdir()
+              if d.is_dir() and not d.name.startswith(".")
+              and d.name not in REFLEXION_SKIP}
+    if not actual:
+        return []
+    # Каталог считается объявленным, если его имя встречается в README где
+    # угодно — таблицей, ссылкой или прозой. Проверяется НАЛИЧИЕ упоминания,
+    # а не его форма: три репы описывают структуру списком, а не таблицей,
+    # и требовать таблицу значило бы проверять вёрстку вместо предмета.
+    undeclared = sorted(d for d in actual if d not in text)
+    if not undeclared:
+        return []
+    return [f"каталог заведён, но в README не объявлен: {d}/" for d in undeclared]
+
+
+def selftest_reflexion_model() -> bool:
+    """Ловит необъявленный каталог, молчит на объявленном и на служебном."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "docs").mkdir()
+        (root / "_base").mkdir()
+        (root / "README.md").write_text("# Репа\n\n| `docs/` | что внутри |\n",
+                                        encoding="utf-8")
+        if check_reflexion_model(root) != []:
+            return False
+        (root / "новый-каталог").mkdir()
+        got = check_reflexion_model(root)
+        return len(got) == 1 and "новый-каталог" in got[0]
+
+
 def check_allowlist_rot(root: Path) -> list[str]:
     """Исключение, пережившее свой предмет, — тихо выключенная проверка.
 
-    Строка в allowlist снимает контроль с файла. Если файл переименован или удалён,
-    строка остаётся и не делает ничего видимого — но следующий файл с таким путём
-    родится уже без проверки. Поэтому каждое исключение обязано указывать
-    на существующий файл (21-revision-protocol.md §4а, календарные мины).
+    Строка в allowlist снимает контроль с файла или каталога. Если предмет
+    переименован или удалён, строка остаётся и ничего видимого не делает —
+    но следующий файл с таким путём родится уже без проверки
+    (`21-revision-protocol.md` §4а, календарные мины).
+
+    🔴 29.08.2026 проверка переведена с жёсткого словаря внутри гейта на
+    `.revision_allowlist` каждой репы — туда исключения и переехали, когда
+    перечень путей заменили правилом (`is_assembly`). Побочная выгода: теперь
+    контроль распространяется на ВСЕ исключения всех реп, а не на четыре
+    записи про base-repo.
     """
-    # 🔴 28.08.2026: реп без `_base/` вовсе (публичные — база им не раздаётся,
-    # `sync-base.sh` пропускает по `isPrivate`) этот список в принципе не касается.
-    # Раньше каждая из 4 записей рапортовала «указывает в пустоту» для такой репы —
-    # технически верно, но вводит в заблуждение: не «протухло», а «неприменимо».
-    has_own_copy = any((root / rel).is_file() for rel in SECTION_DUPES_ALLOWLIST)
-    if not has_own_copy and not (root / "_base").is_dir():
+    allow_file = root / ".revision_allowlist"
+    if not allow_file.is_file():
         return []
     problems: list[str] = []
-    for rel, reason in SECTION_DUPES_ALLOWLIST.items():
-        # 🔴 28.08.2026: вне base-repo эти файлы лежат под `_base/` (раздача 1-в-1) —
-        # тот же случай, что в check_section_dupes чуть выше.
-        if not (root / rel).is_file() and not (root / "_base" / rel).is_file():
-            problems.append(f"исключение указывает в пустоту: {rel} ({reason})")
+    for raw in allow_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        entry = raw.strip()
+        if not entry or entry.startswith("#"):
+            continue
+        # Словарная единица (`cjk-term: …`) предмета на диске не имеет —
+        # она про содержимое, а не про путь. Протухнуть ей нечем.
+        if entry.startswith("cjk-term:"):
+            continue
+        target = root / entry.rstrip("/")
+        if not target.exists():
+            problems.append(f"исключение указывает в пустоту: {entry}")
     return problems
+
+
+def selftest_allowlist_rot() -> bool:
+    """Ловит мёртвую запись и молчит на живой; словарную единицу не трогает."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "жив.md").write_text("x\n", encoding="utf-8")
+        (root / ".revision_allowlist").write_text(
+            "# причина\nжив.md\nумер.md\ncjk-term: X\n", encoding="utf-8")
+        got = check_allowlist_rot(root)
+        return len(got) == 1 and "умер.md" in got[0]
 
 
 def main() -> int:
@@ -1483,6 +1971,11 @@ def main() -> int:
 
     failures: list[str] = []
     warnings: list[str] = []
+
+    if not selftest_uri_schemes():
+        failures.append("канарейка схем URI сломана: перестала отличать "
+                        "адрес со схемой от относительного пути")
+        print("[FAIL] Канарейка схем URI: самопроверка не прошла")
 
     broken, checked, frozen_skipped = check_links(root, files, allowlist)
     if broken:
@@ -1582,6 +2075,69 @@ def main() -> int:
             failures.append("канарейка чисел сломана: не ловит подсаженное расхождение")
             print("[FAIL] Канарейка чисел в прозе: самопроверка не прошла")
 
+    if not selftest_research_reports():
+        failures.append("канарейка отчётов исследования сломана: не ловит отчёт "
+                        "без раскрытия процесса")
+        print("[FAIL] Канарейка отчётов исследования: самопроверка не прошла")
+    else:
+        rr = check_research_reports(root)
+        if rr:
+            failures.extend(rr)
+            print(f"[FAIL] Отчёт исследования не раскрывает процесс: {len(rr)}")
+            for line in rr:
+                print(f"    · {line}")
+
+    if not selftest_secret_hygiene():
+        failures.append("канарейка гигиены секретов сломана: не ловит .env "
+                        "без правила в .gitignore либо ругается на закрытую репу")
+        print("[FAIL] Канарейка гигиены секретов: самопроверка не прошла")
+    else:
+        sec_fails, sec_warns = check_secret_hygiene(root)
+        if sec_fails:
+            failures.extend(sec_fails)
+            print(f"[FAIL] Секреты в файлах репы: {len(sec_fails)}")
+            for line in sec_fails:
+                print(f"    · {line}")
+        if sec_warns:
+            warnings.extend(sec_warns)
+            print(f"[WARN] Секрет лежит значением в `.env` (канон — связка ключей): {len(sec_warns)}")
+            for line in sec_warns:
+                print(f"    · {line}")
+        if not sec_fails and not sec_warns:
+            print("[OK] Гигиена секретов: значений в файлах репы нет")
+
+    if not selftest_reflexion_model():
+        failures.append("канарейка reflexion сломана: не ловит необъявленный каталог")
+        print("[FAIL] Канарейка reflexion-модели: самопроверка не прошла")
+    else:
+        refl = check_reflexion_model(root)
+        if refl:
+            warnings.extend(refl)
+            print(f"[WARN] Структура разошлась с README (reflexion): {len(refl)}")
+            for line in refl:
+                print(f"    · {line}")
+
+    if not selftest_rule_descriptions():
+        failures.append("канарейка описаний правил сломана: не различает "
+                        "описание с поводом сработать и без него")
+        print("[FAIL] Канарейка описаний правил: самопроверка не прошла")
+    else:
+        rd = check_rule_descriptions(root)
+        if rd:
+            failures.extend(rd)
+            print(f"[FAIL] Описание скилла/агента не даёт повода сработать: {len(rd)}")
+            for line in rd:
+                print(f"    · {line}")
+
+    if not selftest_changelog_conventions():
+        failures.append("канарейка конвенций журнала сломана: перестала "
+                        "различать наличие секции версии и её оформление")
+        print("[FAIL] Канарейка конвенций CHANGELOG: самопроверка не прошла")
+
+    if not selftest_allowlist_rot():
+        failures.append("канарейка протухших исключений сломана: не ловит "
+                        "запись, указывающую в пустоту")
+        print("[FAIL] Канарейка протухших исключений: самопроверка не прошла")
     rot = check_allowlist_rot(root)
     if rot:
         failures.extend(rot)
@@ -1597,8 +2153,8 @@ def main() -> int:
             print(f"    · {line}")
     else:
         if selftest_section_dupes():
-            print(f"[OK] Номера разделов внутри документов уникальны "
-                  f"(исключений: {len(SECTION_DUPES_ALLOWLIST)}, все живые)")
+            print("[OK] Номера разделов внутри документов уникальны "
+                  "(сборки — по числу H1, не по списку путей)")
         else:
             failures.append("канарейка разделов сломана: не ловит подсаженные дубли")
             print("[FAIL] Канарейка разделов: самопроверка не прошла")
@@ -1606,8 +2162,14 @@ def main() -> int:
     if not selftest_cjk():
         failures.append("канарейка CJK сломана: не ловит синтетический образец")
         print("[FAIL] Канарейка CJK: самопроверка не прошла")
+    elif not selftest_cjk_terms():
+        # 🔴 Отдельная канарейка: первая проверяет, что иероглиф ЛОВИТСЯ,
+        # вторая — что разрешённый термин не глушит проверку целиком.
+        failures.append("канарейка cjk-term сломана: исключение по термину "
+                        "глушит проверку вместо сужения")
+        print("[FAIL] Канарейка cjk-term: самопроверка не прошла")
     else:
-        cjk_hits = check_cjk(root, files)
+        cjk_hits = check_cjk(root, files, allowlist)
         if cjk_hits:
             failures.extend(cjk_hits)
             print(f"[FAIL] Токен-слип модели, иероглифы в тексте: {len(cjk_hits)}")

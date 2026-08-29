@@ -52,17 +52,69 @@ JUNK_DIRS = {
 }
 
 
+# 🔴 СЕКРЕТЫ НЕ УПАКОВЫВАЮТСЯ. Найдено 29.08.2026 при выработке решения по
+# хранению секретов (`00-infrastructure/94-secret-storage.md`): упаковщик не
+# читает `.gitignore` и клал в архив ЛЮБОЙ файл, включая `.env` с живыми
+# значениями. Архивы намеренно не удаляются (решение владельца 22.08.2026),
+# то есть один такой архив хранит секрет вечно — и это уже случалось:
+# «Отозвать токен VK — `.env` в `vk-graph.zip`, 220 символов»
+# (`mission-control/TASKS.md`). Отозвать секрет из десятков zip нельзя;
+# отозвать его у провайдера — можно, но это уже потеря.
+# `.env.example` (болванки, без значений) — наоборот, ОБЯЗАН попасть в архив:
+# без него непонятно, что вообще нужно для запуска.
+def is_secret_file(name: str) -> bool:
+    if name.endswith(".example") or name.endswith(".template") or name.endswith(".sample"):
+        return False
+    return name == ".env" or name.startswith(".env.") or name in {
+        ".envrc", ".netrc", ".pgpass", ".htpasswd",
+        "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
+    } or name.endswith((".pem", ".key", ".p12", ".pfx", ".keystore", ".jks"))
+
+
+def selftest_secret_files() -> bool:
+    """Секрет исключается, ОБРАЗЕЦ — нет. Проверяется различение."""
+    drop = [".env", ".env.local", ".env.production", ".envrc", ".netrc",
+            "id_rsa", "server.key", "cert.pem", "store.p12"]
+    keep = [".env.example", ".env.template", ".env.sample", "README.md",
+            "config.py", "environment.md", "keys.md"]
+    return (all(is_secret_file(n) for n in drop)
+            and not any(is_secret_file(n) for n in keep))
+
+
+_secrets_reported = False
+
+
 def collect():
+    if not selftest_secret_files():
+        raise SystemExit("🔴 канарейка секретов сломана: упаковщик перестал "
+                         "отличать `.env` от `.env.example` — сборка отменена")
     files = []
+    skipped_secrets = []
     for dp, dn, fns in os.walk(REPO):
         dn[:] = [d for d in dn if d not in JUNK_DIRS]
         for fn in sorted(fns):
             if fn in JUNK_NAMES or fn.startswith("._"):
                 continue
+            # 🔴 Исключение ГРОМКОЕ, а не тихое. Тихо пропущенный `.env`
+            # означал бы, что развёрнутый из архива проект не стартует, и
+            # причина неочевидна. Строка в выводе называет, чего в архиве нет
+            # и чем это собрать обратно.
+            if is_secret_file(fn):
+                skipped_secrets.append(str((Path(dp) / fn).relative_to(REPO)))
+                continue
             p = Path(dp) / fn
             if p.is_symlink() or not p.is_file():
                 continue
             files.append(p)
+    # `collect()` вызывается дважды — на проверке размеров и на самой сборке.
+    # Печатать список дважды значит приучить не читать его вовсе.
+    global _secrets_reported
+    if skipped_secrets and not _secrets_reported:
+        _secrets_reported = True
+        print(f"🔒 в архив НЕ вошли секреты ({len(skipped_secrets)}):")
+        for rel in skipped_secrets:
+            print(f"    · {rel}")
+        print("    Собрать обратно: python3 base-repo/scripts/secret.py env <репа>")
     return sorted(files)
 
 

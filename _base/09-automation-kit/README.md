@@ -82,15 +82,20 @@
 | `deploy_version_gate.py` | не разошлись ли копии `deploy.sh` |
 | `owner_blockers.py` | какие репы ждут владельца |
 | `batch_duration_report.py` | сколько реально занимает батч |
+| 🔴 `gate_monitor.py` | **живы ли сами проверки** — четыре класса мёртвой проверки: канарейка не вызывается · канарейка не различает · `check_*` не вызывается · хук без `+x` или разошёлся с `settings.json`. Второй шаг ритуала (`close_batch.py`), не блокирует |
 
-### Канарейки — 11 внутри `revision_check.py`, 6 скриптов с `--selftest`
+### Канарейки — 19 внутри `revision_check.py`, 7 скриптов с `--selftest`
 
 ```
-selftest_cjk · selftest_mixed_script · selftest_exec_bits
-selftest_registry_dupes · selftest_section_dupes · selftest_campaign_log
-selftest_dangling_refs · selftest_resume_point_refs
-selftest_stale_version_prose · selftest_card_heading_levels
-selftest_prose_counts
+selftest_allowlist_rot · selftest_campaign_log
+selftest_card_heading_levels · selftest_changelog_conventions
+selftest_cjk · selftest_cjk_terms · selftest_dangling_refs
+selftest_exec_bits · selftest_mixed_script · selftest_prose_counts
+selftest_reflexion_model · selftest_registry_dupes
+selftest_research_reports · selftest_resume_point_refs
+selftest_rule_descriptions · selftest_secret_hygiene
+selftest_section_dupes · selftest_stale_version_prose
+selftest_uri_schemes
 ```
 
 **Зачем канарейка отдельно от проверки.** Проверка может ослепнуть — и это
