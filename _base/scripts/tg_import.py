@@ -47,7 +47,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _roots import resolve_roots  # noqa: E402
 BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
 
-EXPORT = Path.home() / "Downloads" / "Telegram Lite" / "DataExport_2026-08-29"
+def _find_export() -> Path:
+    """Свежая выгрузка в `~/Downloads/Telegram Lite/`.
+
+    🔴 Путь БОЛЬШЕ НЕ ПРИБИТ. Первая редакция знала одну дату
+    (`DataExport_2026-08-29`), и вторая выгрузка — другого аккаунта, того же
+    числа — потребовала бы правки кода. Берётся самая свежая папка
+    `DataExport_*`, а если её нет — сам каталог выгрузки.
+    """
+    base = Path.home() / "Downloads" / "Telegram Lite"
+    cands = sorted(base.glob("DataExport_*"), key=lambda p: p.name, reverse=True)
+    return cands[0] if cands else base
+
+
+EXPORT = _find_export()
 RESULT = EXPORT / "result.json"
 
 # 🔴 Маршрут по СМЫСЛУ. Два первых указаны владельцем прямо, остальные
@@ -78,7 +91,16 @@ ROUTE = {
     "Инвестиции/Бизнес/Финансы/Стартапы": "money",
     "Бизнес": "business",
     "FINPILOT Product": "finpilot",
-    "Гос. структуры": "politics",
+    # 🔴 КОЛЛИЗИЯ ИМЁН МЕЖДУ АККАУНТАМИ, разобрана 29.08.2026.
+    # У первого аккаунта «Гос. структуры» — про политику и устройство
+    # государства. У второго (`@sergastokh`) чат с тем же именем — про
+    # задержание, ФЗ «О полиции», права призывника. Проверено чтением.
+    #
+    # Маршрут по ИМЕНИ различить аккаунты не может. Первая выгрузка уже
+    # разобрана и удалена, поэтому маршрут переопределён под содержание
+    # второй. Если появится третья с тем же именем и третьей темой —
+    # придётся различать по аккаунту, а не по названию чата.
+    "Гос. структуры": "legal-knowledge-base",
     "Воспитание характера": "self-map",
     "Семья": "family",
     "Books": "speed-reading",
@@ -106,6 +128,33 @@ ROUTE = {
     "Эволюция": "biology",
     "Ремонт": "misc-vault",
     "Языки": "linguistics",
+
+    # 🔴 ВТОРОЙ АККАУНТ (`@sergastokh`), разобран 29.08.2026. Тема другая:
+    # призыв, военкомат, правовая защита, психиатрический учёт. Маршруты
+    # заданы по СОДЕРЖАНИЮ, проверенному чтением первых сообщений, а не
+    # по названию: «Гос. структуры» у первого аккаунта — про политику,
+    # у второго — про задержание, ФЗ «О полиции» и права призывника.
+    "Мигалка": "security-forces",
+    "Консультант:ка ДСО": "legal-knowledge-base",
+    "Азбука призыва: бот юридической поддержки \"Школа призывника\"": "legal-knowledge-base",
+    "Первая линия": "legal-knowledge-base",
+    "Психиатрия": "health-vault",
+    "Сознательный отказ от военной службы в России": "legal-knowledge-base",
+    "Идите Лесом Бот": "legal-knowledge-base",
+    "ШЕБ [бот]": "security-forces",
+    "Путеводитель по военкомату": "legal-knowledge-base",
+    "Первый ИИ-Помощник призывника": "legal-knowledge-base",
+    "Глаз Бога": "security-forces",
+    # Дозаведено по плану второй выгрузки — до нуля без маршрута.
+    "Троица GPT": "christ-walk",
+    "Помощь в получении израильского гражданства": "nationality",
+    "Психологическая поддержка": "self-map",
+    "ОВД-Инфо-Бот": "legal-knowledge-base",
+    "Вход в Отряд Свободы": "security-forces",
+    "Сеть сознательного отказа ДСО": "legal-knowledge-base",
+    "Music BOARD | Музыка": "portrait-of-taste",
+    "InstVPN": "cybersecurity",
+    "FirstLineHelpBot": "legal-knowledge-base",
 }
 
 # 🔴 ЛИЧНАЯ ПЕРЕПИСКА — В `self-map`, И ЭТО РЕШЕНИЕ ВЛАДЕЛЬЦА 29.08.2026,
@@ -123,6 +172,25 @@ ROUTE = {
 PERSONAL_DEST = "self-map"
 # Учебные семестры — все в одну репу, они одного класса.
 SEMESTER_RE = re.compile(r"^(Учеба|Учёба)\s*[\[({]?\s*\d|^\d+\s*семестр")
+
+
+def account_tag() -> str:
+    """Короткая метка аккаунта из выгрузки — для имён файлов.
+
+    🔴 Без неё вторая выгрузка ЗАТИРАЕТ первую: у обеих есть
+    `saved_messages` и чаты с одинаковыми именами («Гос. структуры»,
+    «Юриспруденция»), и файл лёг бы поверх. Поймано 29.08.2026 планом
+    второй выгрузки — до записи, а не после.
+    """
+    if not RESULT.is_file():
+        return ""
+    try:
+        d = json.loads(RESULT.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    pi = d.get("personal_information", {})
+    tag = (pi.get("username") or pi.get("first_name") or "").strip()
+    return re.sub(r"[^\w-]", "", tag)[:20]
 
 
 def load_chats() -> list[dict]:
@@ -151,6 +219,10 @@ def route_for(name: str) -> str | None:
     """В какую репу идёт чат. None — личная переписка или неопределённое."""
     if name in ROUTE:
         return ROUTE[name]
+    # Имена ботов обрезаются экспортом на разной длине — сверяем по началу.
+    for key, dest in ROUTE.items():
+        if len(key) > 18 and name.startswith(key[:18]):
+            return dest
     if SEMESTER_RE.match(name):
         return "edu-base"
     return None
@@ -278,6 +350,9 @@ def main() -> int:
             print(f"  🔴 {name[:40]}: нет репы `{repo}`")
             continue
         safe = re.sub(r"[^\w\s.()-]", "", name).strip().replace(" ", "-")[:60]
+        tag = account_tag()
+        if tag:
+            safe = f"{tag}-{safe}"
         sub = "communication" if (not route_for(name) and is_personal(chat)) \
             else "imports"
         out = (target / "reports" / sub / f"telegram-{safe}.md"
