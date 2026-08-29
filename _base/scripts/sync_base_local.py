@@ -39,13 +39,17 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import hashlib
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-BASE_REPO = Path(__file__).resolve().parent.parent
-REPOS = BASE_REPO.parent
+# Корень определяется общим модулем: скрипт может быть запущен и из базы,
+# и из копии кита в репе-наследнике (`_base/scripts/`). См. `_roots.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _roots import resolve_roots  # noqa: E402
+BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
 
 JUNK_DIRS = {".git", "__MACOSX", "__pycache__", ".ipynb_checkpoints", ".pytest_cache"}
 JUNK_NAMES = {".DS_Store", "Thumbs.db"}
@@ -114,14 +118,163 @@ def private_repo_names(owner: str = "vevdokimovm") -> set[str]:
     return {r["name"] for r in data if r.get("isPrivate")}
 
 
-def sync_one(repo: Path, canon_version: str, check_only: bool) -> tuple[str, str]:
+PLAN_MODE = False
+
+
+def plan_one(repo: Path, base_dir: Path) -> str:
+    """Что исчезнет и что появится — до того, как это произойдёт.
+
+    🔴 Считается ПО ФАЙЛАМ, а не по версии: план обязан говорить о предмете
+    операции, иначе он повторяет то, что уже сказал `--check`.
+
+    Отдельно называется главное: файлы, которые есть в копии и **отсутствуют**
+    в каноне. Именно они исчезнут безвозвратно — остальные будут перезаписаны
+    тем же или новым содержимым. Если среди них окажется что-то дописанное
+    руками, план — последний момент это заметить.
+    """
+    existing = {p.relative_to(base_dir) for p in base_dir.rglob("*")
+                if p.is_file()} if base_dir.is_dir() else set()
+    incoming = set()
+    for name in _distribute():
+        src = BASE_REPO / name
+        if src.is_dir():
+            # Мусор сборки отбрасывается так же, как это делает копирование
+            # (`_copytree_clean`). Иначе план вечно показывал «новых 30» —
+            # это были `__pycache__/*.pyc`, которые не приедут никогда,
+            # и они же попадали в «ИСЧЕЗНЕТ безвозвратно» (ревью 29.08.2026).
+            incoming |= {Path(name) / p.relative_to(src)
+                         for p in src.rglob("*") if p.is_file()
+                         and not any(x in JUNK_DIRS or x in JUNK_NAMES
+                                     for x in p.relative_to(src).parts)}
+        elif src.is_file():
+            incoming.add(Path(name))
+    # 🔴 Два файла создаёт САМА раздача уже после копирования — штамп версии
+    # и предупреждение о запрете правки. В каноне их нет по построению
+    # (`BASE_VERSION` пишется из `VERSION`, `DO-NOT-EDIT.md` — литералом),
+    # и без этой поправки план объявлял их «исчезающими безвозвратно»
+    # при каждом прогоне по каждой из 54 реп. Ложная тревога, повторённая
+    # 54 раза, гарантированно обучает не читать план.
+    # Три файла создаёт САМА раздача уже после копирования: штамп версии,
+    # отпечаток набора и предупреждение о запрете правки. В каноне их нет
+    # по построению. `BASE_FINGERPRINT` был забыт при заведении отпечатка
+    # и попадал в «ИСЧЕЗНЕТ безвозвратно» на каждом прогоне.
+    incoming |= {Path("BASE_VERSION"), Path("BASE_FINGERPRINT"),
+                 Path("DO-NOT-EDIT.md")}
+    vanish = existing - incoming
+    appear = incoming - existing
+    parts = [f"снесётся {len(existing)}", f"встанет {len(incoming)}"]
+    if vanish:
+        sample = ", ".join(str(v) for v in sorted(vanish)[:3])
+        parts.append(f"🔴 ИСЧЕЗНЕТ безвозвратно {len(vanish)}: {sample}"
+                     + (" …" if len(vanish) > 3 else ""))
+    if appear:
+        parts.append(f"новых {len(appear)}")
+    return " · ".join(parts)
+
+
+def kit_fingerprint() -> str:
+    """sha256 всего раздаваемого набора: путь + содержимое каждого файла.
+
+    🔴 ЗАЧЕМ ОТПЕЧАТОК, ЕСЛИ ЕСТЬ ВЕРСИЯ. Версия — **метка**, отпечаток —
+    **факт**. Правка канона без подъёма версии оставляла раздачу слепой:
+    `--check` отвечал «уже актуальна», и это было верно по метке и неверно
+    по существу. Поймано 29.08.2026 живьём: новый модуль `_roots.py` и правки
+    девяти скриптов не доехали до `chess`, потому что версия совпадала.
+
+    Независимо подтверждено исследованием того же дня: у копирования правил
+    без записи происхождения (vendoring) ровно эта известная слабость —
+    **теряется provenance**, и дрейф копий не обнаруживается ничем.
+    Промышленный ответ (Copybara) — фиксировать состояние синхронизации
+    в метаданных. Здесь то же самое одной строкой: отпечаток набора.
+
+    Считается от **отсортированного** списка, иначе порядок обхода файловой
+    системы менял бы отпечаток при неизменном содержимом.
+    """
+    # 🔴 Исключаются файлы, которые меняет САМА раздача. Иначе отпечаток
+    # нестабилен по построению: посчитали → скопировали → записали журнал
+    # живости → отпечаток стал другим, и следующая же проверка объявляет
+    # расхождение сразу после успешной раздачи. Поймано первым прогоном
+    # 29.08.2026: 54 репы «разошлись» через секунду после раздачи.
+    #
+    # Свойство, а не список (`PIT-097`): в отпечаток не входит то, что
+    # операция пишет о самой себе. Сейчас такой файл один.
+    self_written = {Path("reports/infra-liveness.md")}
+    h = hashlib.sha256()
+    for name in _distribute():
+        src = BASE_REPO / name
+        paths = sorted(src.rglob("*")) if src.is_dir() else [src]
+        for path in paths:
+            if not path.is_file():
+                continue
+            rel = path.relative_to(BASE_REPO)
+            if any(part in JUNK_DIRS or part in JUNK_NAMES for part in rel.parts):
+                continue
+            if rel in self_written:
+                continue
+            h.update(str(rel).encode("utf-8"))
+            h.update(path.read_bytes())
+    return h.hexdigest()[:16]
+
+
+def sync_one(repo: Path, canon_version: str, check_only: bool,
+             force: bool = False, canon_fp: str = "") -> tuple[str, str]:
+    """Привести `_base/` одной репы к канону.
+
+    🔴 СРАВНИВАЕТСЯ ВЕРСИЯ, А НЕ СОДЕРЖАНИЕ, и это надо знать. Версия —
+    **метка**, содержание — **факт**. Правка скриптов базы без подъёма
+    версии не доезжает до наследников: раздача отвечает «уже актуальна»,
+    и она права по метке и неправа по существу.
+
+    Поймано 29.08.2026: новый модуль `_roots.py` и правки девяти скриптов
+    не доехали до `chess`, потому что версия совпадала. Ровно тот же класс,
+    что весь остальной день: **суждение по метке вместо суждения по факту**.
+
+    Почему сравнение по содержанию не сделано умолчанием: это 519 файлов
+    на 60 реп при каждом прогоне, а раздача вызывается шестым шагом каждого
+    батча базы. Вместо этого — явный `--force`, а внутри батча версия
+    поднимается всегда, значит штатный путь не страдает.
+    """
     base_dir = repo / "_base"
+    # 🔴 Отпечаток считается ОДИН раз в main() и передаётся сюда. Раньше
+    # пересчитывался на каждую репу: 0.12 с × 54 = 6.6 с чистого
+    # перехеширования одних и тех же 573 файлов за прогон. И это прямо
+    # противоречило доводу «сравнение по содержанию дорого» — по факту
+    # содержимое читалось целиком 54 раза (ревью 29.08.2026).
+    canon_fp = canon_fp or kit_fingerprint()
     stamp = base_dir / "BASE_VERSION"
     old = stamp.read_text(encoding="utf-8").strip() if stamp.is_file() else "(нет штампа)"
-    if old == canon_version:
-        return (old, "уже актуальна")
+    if PLAN_MODE:
+        # 🔴 План считается ДО сравнения версий. Первая редакция ставила его
+        # после — и при совпадении версий план не показывался вовсе, отвечая
+        # «уже актуальна». Но план это ОСМОТР, а не изменение: вопрос «что
+        # будет снесено» осмыслен независимо от того, собираемся ли мы это
+        # делать прямо сейчас. Инструмент осмотра, молчащий когда «и так всё
+        # хорошо», бесполезен именно в тот момент, когда нужен, — перед
+        # `--force`, который сносит независимо от версии.
+        return (old, plan_one(repo, base_dir))
+
+    # 🔴 СВЕРКА ПО ОТПЕЧАТКУ, А НЕ ТОЛЬКО ПО ВЕРСИИ. Версия ловит отставание,
+    # отпечаток — расхождение. Копия может нести ту же версию и другое
+    # содержимое: так 29.08.2026 правки девяти скриптов не доехали до `chess`,
+    # и раздача честно отвечала «уже актуальна».
+    stamped = (base_dir / "BASE_FINGERPRINT").read_text(encoding="utf-8").strip() \
+        if (base_dir / "BASE_FINGERPRINT").is_file() else ""
+
+    # 🔴 `check_only` проверяется ДО `force`. Раньше `--force` выключал ветку
+    # «уже актуальна», и осмотр на полностью синхронной репе печатал
+    # «РАЗОШЛАСЬ». `--force` — команда «раздавай несмотря на метку», она
+    # не должна менять ВЕРДИКТ ОСМОТРА (ревью 29.08.2026).
+    if old == canon_version and stamped == canon_fp:
+        if check_only or not force:
+            return (old, "уже актуальна")
     if check_only:
-        return (old, "ОТСТАЛА")
+        # Различаем два разных дефекта: отставание видно по версии,
+        # расхождение — только по отпечатку, и лечится оно тем же действием,
+        # но означает другое: копию правили или канон правили без версии.
+        if old != canon_version:
+            return (old, "ОТСТАЛА")
+        return (old, "РАЗОШЛАСЬ (версия та же, содержимое другое)")
+
 
     if base_dir.exists():
         shutil.rmtree(base_dir)
@@ -145,6 +298,10 @@ def sync_one(repo: Path, canon_version: str, check_only: bool) -> tuple[str, str
         encoding="utf-8",
     )
     stamp.write_text(canon_version + "\n", encoding="utf-8")
+    # Отпечаток кладётся рядом с версией: это и есть запись происхождения,
+    # которой у копирования правил (vendoring) нет по умолчанию. Версия ловит
+    # отставание, отпечаток — расхождение при совпавшей версии.
+    (base_dir / "BASE_FINGERPRINT").write_text(canon_fp + "\n", encoding="utf-8")
     return (old, f"→ {canon_version}")
 
 
@@ -153,9 +310,18 @@ def main() -> int:
     ap.add_argument("repo", nargs="?")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--plan", action="store_true",
+                    help="показать, ЧТО именно будет снесено и записано, "
+                         "не делая этого — план отдельно от применения")
+    ap.add_argument("--force", action="store_true",
+                    help="раздать, даже если версия совпадает — "
+                         "версия это метка, содержание может разойтись")
     a = ap.parse_args()
+    global PLAN_MODE
+    PLAN_MODE = a.plan
 
     canon_version = (BASE_REPO / "VERSION").read_text(encoding="utf-8").strip()
+    canon_fp = kit_fingerprint()      # один раз на прогон, не на репу
 
     if a.all:
         try:
@@ -177,6 +343,30 @@ def main() -> int:
         if a.repo == "base-repo":
             print("✗ base-repo не может быть целью синхронизации — это источник канона")
             return 2
+
+        # 🔴 ПРЕДОХРАНИТЕЛЬ ПРИВАТНОСТИ РАБОТАЛ ТОЛЬКО В `--all`.
+        # Найдено ревью кода 29.08.2026: одиночный режим брал репу по имени
+        # без сверки со списком приватных, хотя докстрока обещала «публичные
+        # репы не получают `_base/` никогда — правило ADR-004». На диске
+        # 7 публичных реп; одна опечатка в имени разложила бы в публичный
+        # репозиторий весь канон — включая `scripts/`, `reports/` с разборами
+        # инцидентов и `.claude/` с настройками.
+        #
+        # Инвариант, объявленный в докстроке, обязан держаться на ВСЕХ путях,
+        # а не на том, которым обычно ходят.
+        try:
+            private = private_repo_names()
+        except Exception as exc:
+            print(f"✗ не удалось получить список приватных реп: {exc}")
+            print("  Раздача в одиночном режиме остановлена: без проверки "
+                  "приватности риск разложить канон в публичную репу.")
+            return 2
+        if a.repo not in private:
+            print(f"✗ `{a.repo}` не значится приватной — раздача отменена.")
+            print("  Публичные репы не получают `_base/` никогда (ADR-004):")
+            print("  канон содержит `scripts/`, разборы инцидентов и настройки.")
+            return 2
+
         targets = [REPOS / a.repo]
     else:
         ap.error("нужно имя репы или --all")
@@ -187,10 +377,14 @@ def main() -> int:
         if not repo.is_dir():
             print(f"  нет репы: {repo.name}")
             continue
-        old, verdict = sync_one(repo, canon_version, a.check)
+        old, verdict = sync_one(repo, canon_version, a.check, a.force,
+                                canon_fp)
         print(f"  {repo.name:<26} {old:<10} {verdict}")
 
-    if a.all and not a.check:
+    # Признак живости пишется только за настоящую раздачу: `--plan`
+    # ничего не переносит, и отметка о нём врала про действие,
+    # которого не было (ревью 29.08.2026).
+    if a.all and not a.check and not a.plan:
         _record_liveness(f"канон v{canon_version}, {len(targets)} реп")
     return 0
 

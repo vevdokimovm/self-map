@@ -37,8 +37,12 @@ import argparse
 import hashlib
 from pathlib import Path
 
-BASE_REPO = Path(__file__).resolve().parent.parent
-REPOS = BASE_REPO.parent
+# Корень определяется общим модулем: скрипт может быть запущен и из базы,
+# и из копии кита в репе-наследнике (`_base/scripts/`). См. `_roots.py`.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _roots import resolve_roots  # noqa: E402
+BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
 SKIP_NAMES = {".DS_Store", ".gitkeep"}
 
 # 🔴 МУСОР, КОТОРЫЙ ПРИЕХАЛ С МАТЕРИАЛОМ. Word держит файл-замок `~$имя.docx` (162 байта,

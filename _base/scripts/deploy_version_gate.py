@@ -90,6 +90,17 @@ FROZEN_PREFIXES = (
     "repos-map-CHANGELOG.md",
 )
 
+# 🔴 29.08.2026: перечень выше знал `CHANGELOG.md`, но не знал `*_HISTORY.md` —
+# и гейт потребовал переписать строку «прогон 28.08.2026: 295 из 295 зелёных
+# (deploy.sh v4.22.0)» в `ROADMAP_HISTORY.md`. Это **исторический факт о прошлом
+# прогоне**: тогда деплойер действительно был v4.22.0, и правка сделала бы
+# запись ложной.
+#
+# Признак заморозки структурный, а не списочный: файл истории — это тот, чьё
+# имя кончается на `_HISTORY.md` или `-CHANGELOG.md`. Правило покрывает и те
+# файлы истории, которых ещё нет.
+FROZEN_SUFFIXES = ("_HISTORY.md", "-CHANGELOG.md", "/CHANGELOG.md")
+
 VERSION_RE = re.compile(r"^SCRIPT_VERSION=\"([0-9]+\.[0-9]+\.[0-9]+)\"", re.M)
 HEADER_RE = re.compile(r"^# deploy\.sh v([0-9]+\.[0-9]+\.[0-9]+)", re.M)
 CHLOG_TOP_RE = re.compile(r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\]", re.M)
@@ -120,7 +131,8 @@ def read_canon(root: Path) -> tuple[str, Path]:
 
 def is_frozen(rel: str) -> bool:
     """Файл лежит в замороженной зоне, где старые номера законны."""
-    return any(rel == p or rel.startswith(p) for p in FROZEN_PREFIXES)
+    return (any(rel == p or rel.startswith(p) for p in FROZEN_PREFIXES)
+            or any(rel.endswith(sfx) for sfx in FROZEN_SUFFIXES))
 
 
 def check_header(script: Path, canon: str) -> tuple[list[str], str | None]:

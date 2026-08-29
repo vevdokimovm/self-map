@@ -40,8 +40,11 @@ import sys
 from datetime import date
 from pathlib import Path
 
-BASE_REPO = Path(__file__).resolve().parent.parent
-REPOS = BASE_REPO.parent
+# Корень определяется общим модулем: скрипт может быть запущен и из базы,
+# и из копии кита в репе-наследнике (`_base/scripts/`). См. `_roots.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _roots import resolve_roots  # noqa: E402
+BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
 TODAY = date.today().isoformat()
 
 # Как читает версию сам deploy.sh — сверяемся ровно этим выражением, а не похожим.
@@ -71,10 +74,21 @@ def current_watch() -> str:
         email = (d.get("oauthAccount") or {}).get("emailAddress") or ""
     except Exception:
         return "?"
-    return {
-        "vevdokimovm@gmail.com": "V",
-        "finpilot.support@proton.me": "A",
-    }.get(email, "?")
+    if not email:
+        return "?"
+    # 🔴 29.08.2026: здесь стоял ПЕРЕЧЕНЬ из двух вахт — тот же дефект, что
+    # литеральное «V» до него, только мягче: две вахты работали, три молча
+    # получали «?». Поймано на вахте S (`gertab95@gmail.com`) сразу после
+    # `/login`. Перечень покрывает ровно то, что кто-то однажды вписал;
+    # правило читает реестр, который и так обязан быть верным.
+    registry = _P(__file__).resolve().parent.parent / "00-infrastructure" / "84-claude-accounts.md"
+    if registry.is_file():
+        for line in registry.read_text(encoding="utf-8", errors="replace").splitlines():
+            if email in line:
+                m = re.search(r"\*\*([VJMSA])\*\*", line)
+                if m:
+                    return m.group(1)
+    return "?"
 
 
 def bump(v: str, kind: str) -> str:
@@ -86,8 +100,38 @@ def bump(v: str, kind: str) -> str:
     return f"{a}.{int(b)+1}.0"
 
 
+# Указатель — короткий файл, чьё содержание: «настоящий лежит там».
+# 🔴 29.08.2026: `bump_repo.py` вписал `**Версия:**` прямо в файл-указатель
+# `personal-finance-dss/WATCHLOG.md` — и **восстановил тот самый третий источник
+# правды о состоянии**, который в том же батче был оттуда убран. Инструмент,
+# не различающий документ и указатель на документ, отменяет работу по разведению
+# источников молча и на каждом подъёме версии.
+POINTER_MAX_LINES = 40
+
+
+def follow_pointer(path: Path) -> Path:
+    """Настоящий файл, если этот — указатель; иначе он сам."""
+    if not path.is_file():
+        return path
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if len(text.splitlines()) > POINTER_MAX_LINES:
+        return path
+    for m in re.finditer(r"\[[^\]]*\]\(([^)]+)\)|`([^`]+)`", text):
+        target = (m.group(1) or m.group(2) or "").strip()
+        if not target or target.startswith(("http", "#")):
+            continue
+        if Path(target).name != path.name:
+            continue
+        candidate = (path.parent / target).resolve()
+        if candidate.is_file() and candidate != path.resolve():
+            return candidate
+    return path
+
+
 def watchlog_version(repo: Path) -> str | None:
-    wl = repo / "WATCHLOG.md"
+    # Идём по указателю, как write_watchlog и sync_resume_point: иначе сверка
+    # читает заглушку, не находит версии и валит батч на ровном месте.
+    wl = follow_pointer(repo / "WATCHLOG.md")
     if not wl.is_file():
         return None
     m = WL_VERSION.search(wl.read_text(encoding="utf-8", errors="replace"))
@@ -127,7 +171,7 @@ def check_all() -> int:
 
 def write_watchlog(repo: Path, new: str) -> str:
     """Строка `**Версия:**` — то, что читает деплой. Нет её — создаём."""
-    wl = repo / "WATCHLOG.md"
+    wl = follow_pointer(repo / "WATCHLOG.md")
     if not wl.is_file():
         wl.write_text(f"# {repo.name} — Вахтенный журнал\n\n"
                       f"**Версия:** {new} · **Дата:** {TODAY} · **Вахта:** {current_watch()}\n",
@@ -155,7 +199,7 @@ def sync_resume_point(repo: Path, new: str) -> str | None:
     массового прогона по 45 репам: каждая получила `PIT-094` от своего же
     подъёма.
     """
-    wl = repo / "WATCHLOG.md"
+    wl = follow_pointer(repo / "WATCHLOG.md")
     if not wl.is_file():
         return None
     t = wl.read_text(encoding="utf-8")

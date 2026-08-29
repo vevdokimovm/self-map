@@ -33,7 +33,16 @@
 
 set -Eeuo pipefail
 
-MAP_FILE="${CLAUDE_PROJECT_DIR:-$PWD}/../mission-control/ACCOUNTS.md"
+# 🔴 29.08.2026: источник — реестр вахт в БАЗЕ, а не сводка в планировщике.
+# `mission-control/ACCOUNTS.md` отвечает на вопрос «у какой вахты живая
+# подписка» и почт в таблице не держит; полная таблица «вахта → почта → org id»
+# живёт в `84-claude-accounts.md`. Хук искал почту там, где её нет, и молча
+# не находил — при этом ветка `case` знала ровно две вахты из пяти, поэтому
+# отказ был не виден: две работали, три «не опознавались».
+MAP_FILE="${CLAUDE_PROJECT_DIR:-$PWD}/00-infrastructure/84-claude-accounts.md"
+# Запасной адрес — сводка планировщика: если базы рядом нет (хук раздаётся
+# в 54 репы), почта может найтись там.
+MAP_FALLBACK="${CLAUDE_PROJECT_DIR:-$PWD}/../mission-control/ACCOUNTS.md"
 STATE_DIR="${TMPDIR:-/tmp}/claude-watch-identity"
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 STATE_FILE="$STATE_DIR/last-email"
@@ -61,18 +70,19 @@ fi
 # --- сопоставить с буквой вахты ------------------------------------------------
 # Источник соответствия — ACCOUNTS.md планировщика. Хардкод здесь был бы
 # четвёртой копией правды (PIT-097: список — намерение, свойство — факт).
+# 🔴 ПЕРЕЧНЯ ЗДЕСЬ БОЛЬШЕ НЕТ. Прежняя редакция знала две вахты из пяти
+# литералами, а остальные искала в файле — и на вахте S (`gertab95@gmail.com`)
+# промолчала: литерала нет, файл не тот. Тот же класс, что `PIT-163`
+# (буква вахты была захардкожена в `bump_repo.py`) и что перечень схем URI
+# в гейте: перечень покрывает ровно замеченное, правило — все случаи.
+# Ищем строку таблицы, где встречается эта почта, и берём из неё букву.
 letter=""
-case "$email" in
-  vevdokimovm@gmail.com)        letter="V" ;;
-  finpilot.support@proton.me)   letter="A" ;;
-  *)
-    # не захардкожено — ищем в таблице ACCOUNTS.md по email
-    if [ -f "$MAP_FILE" ]; then
-      letter="$(grep -oE '\*\*[VJMSA]\*\*[^|]*\|[^|]*'"${email//./\\.}" "$MAP_FILE" 2>/dev/null \
-                | grep -oE '\*\*[VJMSA]\*\*' | head -1 | tr -d '*')"
-    fi
-    ;;
-esac
+for f in "$MAP_FILE" "$MAP_FALLBACK"; do
+  [ -f "$f" ] || continue
+  [ -n "$letter" ] && break
+  letter="$(grep -F "$email" "$f" 2>/dev/null \
+            | grep -oE '\*\*[VJMSA]\*\*' | head -1 | tr -d '*')"
+done
 
 prev=""
 [ -f "$STATE_FILE" ] && prev="$(cat "$STATE_FILE" 2>/dev/null || true)"
