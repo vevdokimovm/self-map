@@ -52,10 +52,14 @@ from _roots import resolve_roots  # noqa: E402
 
 BASE_REPO, REPOS, _ = resolve_roots(__file__)
 OWNER = "vevdokimovm"
+_LIST: list | None = None
 
 
-def public_on_github() -> set[str] | None:
-    """Имена публичных реп. None — спросить не удалось (сеть, авторизация)."""
+def _repo_list() -> list | None:
+    """Один запрос к GitHub на прогон — его результат нужен трижды."""
+    global _LIST
+    if _LIST is not None:
+        return _LIST
     try:
         r = subprocess.run(
             ["gh", "repo", "list", OWNER, "--limit", "300",
@@ -66,8 +70,22 @@ def public_on_github() -> set[str] | None:
     if r.returncode != 0:
         return None
     try:
-        data = json.loads(r.stdout)
+        _LIST = json.loads(r.stdout)
     except json.JSONDecodeError:
+        return None
+    return _LIST
+
+
+def all_on_github() -> set[str] | None:
+    """Все репы аккаунта, любой видимости. None — спросить не удалось."""
+    data = _repo_list()
+    return None if data is None else {d["name"] for d in data}
+
+
+def public_on_github() -> set[str] | None:
+    """Имена публичных реп. None — спросить не удалось (сеть, авторизация)."""
+    data = _repo_list()
+    if data is None:
         return None
     return {d["name"] for d in data if d.get("visibility") == "PUBLIC"}
 
@@ -87,6 +105,24 @@ def mirrors_in_deploy(text: str) -> set[str]:
     if inner:
         raw = inner.group(1)
     return set(raw.split())
+
+
+def phantom_mirrors(gh: set[str], mr: set[str], all_repos: set[str]) -> list[str]:
+    """Имена из `MIRRORS`, которых на GitHub нет вовсе.
+
+    🔴 Это НЕ дефект защиты: список зеркал работает на пропуск, и лишнее имя
+    в нём инертно. Более того, `mission-control::ADR-009` требует вносить зеркало **в момент
+    создания**, а не после инцидента, — то есть имя вперёд репы законно.
+
+    Но замер 04.09.2026 показал другое: **4 из 12** имён не существуют,
+    и одно из них — `bron-kerbosch` — стояло в `ROADMAP` как ✅ опубликованная
+    ступень витрины. Список не сверяли ни разу, и он тихо хранил
+    несостоявшийся план.
+
+    Поэтому строка **информационная, а не пороговая**: она рассказывает,
+    а не краснеет.
+    """
+    return sorted(mr - all_repos)
 
 
 def compare(gh: set[str], mp: set[str], mr: set[str]) -> list[str]:
@@ -120,6 +156,10 @@ def selftest() -> int:
         ("карта отстала от GitHub — находка",
          lambda: any("не помечена в repos-map" in s
                      for s in compare({"a", "b"}, {"a"}, {"a", "b"}))),
+        ("призрачное зеркало названо",
+         lambda: phantom_mirrors({"a"}, {"a", "prizrak"}, {"a"}) == ["prizrak"]),
+        ("существующее зеркало призраком не считается",
+         lambda: phantom_mirrors({"a"}, {"a", "b"}, {"a", "b"}) == []),
         ("карта врёт в другую сторону — находка",
          lambda: any("на GitHub приватна" in s
                      for s in compare({"a"}, {"a", "b"}, {"a", "b"}))),
@@ -156,6 +196,17 @@ def main() -> int:
     print(f"  GitHub      : {len(gh):>3}  ← источник правды")
     print(f"  repos-map.md: {len(mp):>3}")
     print(f"  MIRRORS     : {len(mr):>3}  (шире по построению: там и будущие зеркала)\n")
+
+    every = all_on_github()
+    if every is not None:
+        ghost = phantom_mirrors(gh, mr, every)
+        if ghost:
+            print(f"🟡 в MIRRORS, но на GitHub НЕТ — {len(ghost)}: "
+                  f"{', '.join(ghost)}")
+            print("   Не дефект: список работает на пропуск, лишнее имя инертно,")
+            print("   и `mission-control::ADR-009` разрешает вносить зеркало ДО создания репы.")
+            print("   Но замер 04.09.2026 показал, что список не сверяли ни разу:")
+            print("   `bron-kerbosch` стоял в `ROADMAP` как ✅ опубликованный.\n")
 
     bad = compare(gh, mp, mr)
     if not bad:
