@@ -1,4 +1,4 @@
-# 64. Локальная песочница для Claude Code (`~/ClaudeSandbox`) — не переустанавливать каждый раз
+# 64. Локальная песочница для Claude Code (`~/claude-sandbox`) — не переустанавливать каждый раз
 
 > Повод: сессия №41–42 потратила больше получаса на установку numpy/Pillow под разные Python
 > на маке (несколько версий Python вперемешку, не у всех рабочий pip, один инсталл завис из-за
@@ -16,7 +16,7 @@
 ## Расположение
 
 ```
-~/ClaudeSandbox/venv/          — виртуальное окружение (python3.13, из Homebrew)
+~/claude-sandbox/venv/          — виртуальное окружение (python3.13, из Homebrew)
 ```
 
 Создано от `/usr/local/opt/python@3.13/bin/python3.13` (Homebrew, рабочий pip) —
@@ -49,11 +49,11 @@
 ## Как пользоваться
 
 ```bash
-~/ClaudeSandbox/venv/bin/python3 -c "import numpy, PIL, pypdf, fitz, pandas, docx, bs4; print('ok')"
-~/ClaudeSandbox/venv/bin/pip install <ещё_что-то>   # если понадобится новый пакет
+~/claude-sandbox/venv/bin/python3 -c "import numpy, PIL, pypdf, fitz, pandas, docx, bs4; print('ok')"
+~/claude-sandbox/venv/bin/pip install <ещё_что-то>   # если понадобится новый пакет
 ```
 
-Полный список того, что уже стоит: `~/ClaudeSandbox/venv/bin/pip list`.
+Полный список того, что уже стоит: `~/claude-sandbox/venv/bin/pip list`.
 
 ## 🔴 Чего Claude Code НЕ ограничен — в отличие от браузерной песочницы
 
@@ -150,5 +150,5 @@
 - 19.08.2026, сессия №41: первая версия, `~/.claude-sandbox`, от `/usr/bin/python3` (Apple
   system Python) — только `numpy`+`Pillow`+`pypdf`, без `fitz`.
 - 19.08.2026, сессия №42, по прямому запросу Василия («1 в 1 как в веб-версии, и если можно —
-  лучше»): пересобрана как `~/ClaudeSandbox/venv` от Homebrew `python3.13`, полный набор
+  лучше»): пересобрана как `~/claude-sandbox/venv` от Homebrew `python3.13`, полный набор
   (см. таблицу выше). **Старая `~/.claude-sandbox` удалена**, использовать только новую.

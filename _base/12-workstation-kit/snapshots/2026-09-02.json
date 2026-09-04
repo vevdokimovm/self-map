@@ -1,0 +1,908 @@
+{
+ "снято": "2026-09-02",
+ "приложений": 98,
+ "приложения": [
+  {
+   "имя": "Backup and Sync",
+   "путь": "/Applications/Backup and Sync.app",
+   "папка": "—",
+   "мб": 93,
+   "версия": "3.57",
+   "изменён": "2022-02-01",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Google Chrome",
+   "путь": "/Applications/Google Chrome.app",
+   "папка": "—",
+   "мб": 0,
+   "версия": "151.0.7922.138",
+   "изменён": "2026-07-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "OneDrive",
+   "путь": "/Applications/OneDrive.app",
+   "папка": "—",
+   "мб": 202,
+   "версия": "26.074.0420",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Outread",
+   "путь": "/Applications/Outread.app",
+   "папка": "—",
+   "мб": 22,
+   "версия": "2.8",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Safari",
+   "путь": "/Applications/Safari.app",
+   "папка": "—",
+   "мб": 0,
+   "версия": "26.5",
+   "изменён": "2026-05-02",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "TapRecord",
+   "путь": "/Applications/TapRecord.app",
+   "папка": "—",
+   "мб": 18,
+   "версия": "2.1.0",
+   "изменён": "2025-11-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "The Unarchiver",
+   "путь": "/Applications/The Unarchiver.app",
+   "папка": "—",
+   "мб": 48,
+   "версия": "4.3.9",
+   "изменён": "2026-04-11",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Transmission",
+   "путь": "/Applications/Transmission.app",
+   "папка": "—",
+   "мб": 16,
+   "версия": "4.0.6",
+   "изменён": "2024-05-29",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "AdobeIPCBroker",
+   "путь": "/Applications/Utilities/Adobe Application Manager/IPC/AdobeIPCBroker.app",
+   "папка": "Utilities/Adobe Application Manager/IPC",
+   "мб": 0,
+   "версия": "5.6.0.41",
+   "изменён": "2020-10-16",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "AdobeCleanUpUtility",
+   "путь": "/Applications/Utilities/Adobe Genuine Service/AdobeCleanUpUtility.app",
+   "папка": "Utilities/Adobe Genuine Service",
+   "мб": 0,
+   "версия": "8.2.0.34",
+   "изменён": "2021-04-25",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "AdobeGCClient",
+   "путь": "/Applications/Utilities/Adobe Genuine Service/AdobeGCClient.app",
+   "папка": "Utilities/Adobe Genuine Service",
+   "мб": 0,
+   "версия": "8.2.0.34",
+   "изменён": "2020-10-16",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Core Sync",
+   "путь": "/Applications/Utilities/Adobe Sync/CoreSync/Core Sync.app",
+   "папка": "Utilities/Adobe Sync/CoreSync",
+   "мб": 95,
+   "версия": "5.4.0.15",
+   "изменён": "2022-02-10",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "ACCFinderBundleLoader",
+   "путь": "/Applications/Utilities/Adobe Sync/CoreSyncExtension/ACCFinderBundleLoader.app",
+   "папка": "Utilities/Adobe Sync/CoreSyncExtension",
+   "мб": 32,
+   "версия": "5.4.0.15",
+   "изменён": "2022-02-10",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "FirmwareUpdater",
+   "путь": "/Applications/Wacom Tablet.localized/.Tablet/FirmwareUpdater.app",
+   "папка": "Wacom Tablet.localized/.Tablet",
+   "мб": 7,
+   "версия": "3.27",
+   "изменён": "2021-09-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "TabletDriver",
+   "путь": "/Applications/Wacom Tablet.localized/.Tablet/TabletDriver.app",
+   "папка": "Wacom Tablet.localized/.Tablet",
+   "мб": 4,
+   "версия": "—",
+   "изменён": "2021-09-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "WacomTabletDriver",
+   "путь": "/Applications/Wacom Tablet.localized/.Tablet/WacomTabletDriver.app",
+   "папка": "Wacom Tablet.localized/.Tablet",
+   "мб": 72,
+   "версия": "Wacom Tablet 6.3.44-1",
+   "изменён": "2021-09-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "WacomTouchDriver",
+   "путь": "/Applications/Wacom Tablet.localized/.Tablet/WacomTouchDriver.app",
+   "папка": "Wacom Tablet.localized/.Tablet",
+   "мб": 22,
+   "версия": "Wacom Touch 6.3.44-1",
+   "изменён": "2021-09-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Wacom Desktop Center",
+   "путь": "/Applications/Wacom Tablet.localized/Wacom Desktop Center.app",
+   "папка": "Wacom Tablet.localized",
+   "мб": 36,
+   "версия": "6.3.44-1",
+   "изменён": "2021-09-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Wacom Display Settings",
+   "путь": "/Applications/Wacom Tablet.localized/Wacom Display Settings.app",
+   "папка": "Wacom Tablet.localized",
+   "мб": 7,
+   "версия": "6.3.44-1",
+   "изменён": "2021-09-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Wacom Tablet Utility",
+   "путь": "/Applications/Wacom Tablet.localized/Wacom Tablet Utility.app",
+   "папка": "Wacom Tablet.localized",
+   "мб": 6,
+   "версия": "6.3.44-1",
+   "изменён": "2021-09-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Antigravity",
+   "путь": "/Applications/ai/Antigravity.app",
+   "папка": "ai",
+   "мб": 435,
+   "версия": "2.0.1",
+   "изменён": "2026-05-19",
+   "похоже_на_ии": true
+  },
+  {
+   "имя": "Claude",
+   "путь": "/Applications/ai/Claude.app",
+   "папка": "ai",
+   "мб": 794,
+   "версия": "1.26832.0",
+   "изменён": "2026-08-06",
+   "похоже_на_ии": true
+  },
+  {
+   "имя": "Devin",
+   "путь": "/Applications/ai/Devin.app",
+   "папка": "ai",
+   "мб": 1103,
+   "версия": "3.7.25",
+   "изменён": "2026-08-13",
+   "похоже_на_ии": true
+  },
+  {
+   "имя": "Granola",
+   "путь": "/Applications/ai/Granola.app",
+   "папка": "ai",
+   "мб": 605,
+   "версия": "7.452.4",
+   "изменён": "2026-08-03",
+   "похоже_на_ии": true
+  },
+  {
+   "имя": "Ollama",
+   "путь": "/Applications/ai/Ollama.app",
+   "папка": "ai",
+   "мб": 520,
+   "версия": "0.23.2",
+   "изменён": "2026-05-09",
+   "похоже_на_ии": true
+  },
+  {
+   "имя": "Pencil",
+   "путь": "/Applications/ai/Pencil.app",
+   "папка": "ai",
+   "мб": 764,
+   "версия": "1.1.55",
+   "изменён": "2026-04-30",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Wispr Flow",
+   "путь": "/Applications/ai/Wispr Flow.app",
+   "папка": "ai",
+   "мб": 471,
+   "версия": "1.5.113",
+   "изменён": "2026-04-30",
+   "похоже_на_ии": true
+  },
+  {
+   "имя": "Brave Browser",
+   "путь": "/Applications/browsers/Brave Browser.app",
+   "папка": "browsers",
+   "мб": 725,
+   "версия": "151.1.93.136",
+   "изменён": "2026-08-12",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "DuckDuckGo",
+   "путь": "/Applications/browsers/DuckDuckGo.app",
+   "папка": "browsers",
+   "мб": 217,
+   "версия": "1.196.0",
+   "изменён": "2026-07-04",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Firefox",
+   "путь": "/Applications/browsers/Firefox.app",
+   "папка": "browsers",
+   "мб": 503,
+   "версия": "154.0.1",
+   "изменён": "2026-08-27",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Google Chrome",
+   "путь": "/Applications/browsers/Google Chrome.app",
+   "папка": "browsers",
+   "мб": 1405,
+   "версия": "151.0.7922.138",
+   "изменён": "2026-07-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "LibreWolf",
+   "путь": "/Applications/browsers/LibreWolf.app",
+   "папка": "browsers",
+   "мб": 420,
+   "версия": "153.0.4-1",
+   "изменён": "2026-08-12",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Mullvad Browser",
+   "путь": "/Applications/browsers/Mullvad Browser.app",
+   "папка": "browsers",
+   "мб": 386,
+   "версия": "15.0.20",
+   "изменён": "2026-08-17",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Safari",
+   "путь": "/Applications/browsers/Safari.app",
+   "папка": "browsers",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Tor Browser",
+   "путь": "/Applications/browsers/Tor Browser.app",
+   "папка": "browsers",
+   "мб": 479,
+   "версия": "15.0.20",
+   "изменён": "2026-08-19",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Vivaldi",
+   "путь": "/Applications/browsers/Vivaldi.app",
+   "папка": "browsers",
+   "мб": 679,
+   "версия": "8.1.4087.64",
+   "изменён": "2026-08-12",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "FaceTime",
+   "путь": "/Applications/communitcation/FaceTime.app",
+   "папка": "communitcation",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Proton Mail",
+   "путь": "/Applications/communitcation/Proton Mail.app",
+   "папка": "communitcation",
+   "мб": 451,
+   "версия": "1.12.1",
+   "изменён": "2026-01-27",
+   "похоже_на_ии": true
+  },
+  {
+   "имя": "Signal",
+   "путь": "/Applications/communitcation/Signal.app",
+   "папка": "communitcation",
+   "мб": 648,
+   "версия": "8.4.1",
+   "изменён": "2026-03-27",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Telegram Lite",
+   "путь": "/Applications/communitcation/Telegram Lite.app",
+   "папка": "communitcation",
+   "мб": 166,
+   "версия": "6.8.2",
+   "изменён": "2026-07-12",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Telegram",
+   "путь": "/Applications/communitcation/Telegram.app",
+   "папка": "communitcation",
+   "мб": 145,
+   "версия": "12.9",
+   "изменён": "2026-07-20",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "WhatsApp",
+   "путь": "/Applications/communitcation/WhatsApp.app",
+   "папка": "communitcation",
+   "мб": 261,
+   "версия": "26.19.76",
+   "изменён": "2026-05-24",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "zoom.us",
+   "путь": "/Applications/communitcation/zoom.us.app",
+   "папка": "communitcation",
+   "мб": 213,
+   "версия": "6.7.6 (75444)",
+   "изменён": "2026-03-02",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "DB Browser for SQLite",
+   "путь": "/Applications/developer/DB Browser for SQLite.app",
+   "папка": "developer",
+   "мб": 104,
+   "версия": "3.13.1",
+   "изменён": "2024-10-15",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "DBeaver",
+   "путь": "/Applications/developer/DBeaver.app",
+   "папка": "developer",
+   "мб": 167,
+   "версия": "25.0.3",
+   "изменён": "2025-04-20",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Docker",
+   "путь": "/Applications/developer/Docker.app",
+   "папка": "developer",
+   "мб": 2232,
+   "версия": "4.69.0",
+   "изменён": "2026-04-10",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "MySQLWorkbench",
+   "путь": "/Applications/developer/MySQLWorkbench.app",
+   "папка": "developer",
+   "мб": 238,
+   "версия": "8.0.42.CE",
+   "изменён": "2025-04-14",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "IDLE",
+   "путь": "/Applications/developer/Python 3.10/IDLE.app",
+   "папка": "developer/Python 3.10",
+   "мб": 0,
+   "версия": "3.10.0",
+   "изменён": "2024-12-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Python Launcher",
+   "путь": "/Applications/developer/Python 3.10/Python Launcher.app",
+   "папка": "developer/Python 3.10",
+   "мб": 0,
+   "версия": "3.10.0",
+   "изменён": "2024-12-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "IDLE",
+   "путь": "/Applications/developer/Python 3.13/IDLE.app",
+   "папка": "developer/Python 3.13",
+   "мб": 0,
+   "версия": "3.13.1",
+   "изменён": "2024-12-16",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Python Launcher",
+   "путь": "/Applications/developer/Python 3.13/Python Launcher.app",
+   "папка": "developer/Python 3.13",
+   "мб": 0,
+   "версия": "3.13.1",
+   "изменён": "2024-12-16",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Sublime Text",
+   "путь": "/Applications/developer/Sublime Text.app",
+   "папка": "developer",
+   "мб": 111,
+   "версия": "Build 4200",
+   "изменён": "2025-05-24",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Visual Studio Code",
+   "путь": "/Applications/developer/Visual Studio Code.app",
+   "папка": "developer",
+   "мб": 679,
+   "версия": "1.121.0",
+   "изменён": "2026-04-17",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "iTerm",
+   "путь": "/Applications/developer/iTerm.app",
+   "папка": "developer",
+   "мб": 134,
+   "версия": "3.6.11",
+   "изменён": "2026-06-03",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Microsoft Word",
+   "путь": "/Applications/notes/Microsoft Word.app",
+   "папка": "notes",
+   "мб": 1669,
+   "версия": "16.109.1",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Notes",
+   "путь": "/Applications/notes/Notes.app",
+   "папка": "notes",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Notion",
+   "путь": "/Applications/notes/Notion.app",
+   "папка": "notes",
+   "мб": 276,
+   "версия": "7.11.0",
+   "изменён": "2026-04-14",
+   "похоже_на_ии": true
+  },
+  {
+   "имя": "Obsidian",
+   "путь": "/Applications/notes/Obsidian.app",
+   "папка": "notes",
+   "мб": 481,
+   "версия": "1.12.7",
+   "изменён": "2026-03-23",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "RemNote",
+   "путь": "/Applications/notes/RemNote.app",
+   "папка": "notes",
+   "мб": 525,
+   "версия": "1.26.20",
+   "изменён": "2026-06-04",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Stickies",
+   "путь": "/Applications/notes/Stickies.app",
+   "папка": "notes",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "TextEdit",
+   "путь": "/Applications/notes/TextEdit.app",
+   "папка": "notes",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Transparent Note",
+   "путь": "/Applications/notes/Transparent Note.app",
+   "папка": "notes",
+   "мб": 15,
+   "версия": "2.4.0",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "osu!",
+   "путь": "/Applications/osu!.app",
+   "папка": "—",
+   "мб": 309,
+   "версия": "lazer",
+   "изменён": "2026-08-04",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Bitwarden",
+   "путь": "/Applications/privacy:cybersecurity/Bitwarden.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 287,
+   "версия": "2026.3.1",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Cryptomator",
+   "путь": "/Applications/privacy:cybersecurity/Cryptomator.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 135,
+   "версия": "1.19.2",
+   "изменён": "2026-03-20",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "DeltaChat",
+   "путь": "/Applications/privacy:cybersecurity/DeltaChat.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 269,
+   "версия": "2.49.1",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Happ",
+   "путь": "/Applications/privacy:cybersecurity/Happ.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 107,
+   "версия": "4.9.0",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Karing",
+   "путь": "/Applications/privacy:cybersecurity/Karing.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 95,
+   "версия": "1.2.1",
+   "изменён": "2026-04-14",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "RabbitHole",
+   "путь": "/Applications/privacy:cybersecurity/RabbitHole.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 36,
+   "версия": "1.3.1",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "V2Box",
+   "путь": "/Applications/privacy:cybersecurity/V2Box.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 92,
+   "версия": "9.8.7",
+   "изменён": "2026-01-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "VeraCrypt",
+   "путь": "/Applications/privacy:cybersecurity/VeraCrypt.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 49,
+   "версия": "1.26.24",
+   "изменён": "2026-03-31",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "v2RayTun",
+   "путь": "/Applications/privacy:cybersecurity/v2RayTun.app",
+   "папка": "privacy:cybersecurity",
+   "мб": 71,
+   "версия": "2.2",
+   "изменён": "2026-02-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Be Focused",
+   "путь": "/Applications/productivity/Be Focused.app",
+   "папка": "productivity",
+   "мб": 24,
+   "версия": "2.5.2",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Books",
+   "путь": "/Applications/productivity/Books.app",
+   "папка": "productivity",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Calendar",
+   "путь": "/Applications/productivity/Calendar.app",
+   "папка": "productivity",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Endel",
+   "путь": "/Applications/productivity/Endel.app",
+   "папка": "productivity",
+   "мб": 223,
+   "версия": "4.48.349",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Reminders",
+   "путь": "/Applications/productivity/Reminders.app",
+   "папка": "productivity",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Todoist",
+   "путь": "/Applications/productivity/Todoist.app",
+   "папка": "productivity",
+   "мб": 293,
+   "версия": "9.30.0",
+   "изменён": "2026-08-04",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Activity Monitor",
+   "путь": "/Applications/system_control_panel/Activity Monitor.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Disk Utility",
+   "путь": "/Applications/system_control_panel/Disk Utility.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Find My",
+   "путь": "/Applications/system_control_panel/Find My.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Launchpad",
+   "путь": "/Applications/system_control_panel/Launchpad.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Macs Fan Control",
+   "путь": "/Applications/system_control_panel/Macs Fan Control.app",
+   "папка": "system_control_panel",
+   "мб": 54,
+   "версия": "1.5.21",
+   "изменён": "2026-04-13",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Mission Control",
+   "путь": "/Applications/system_control_panel/Mission Control.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "QuickTime Player",
+   "путь": "/Applications/system_control_panel/QuickTime Player.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "System Settings",
+   "путь": "/Applications/system_control_panel/System Settings.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Terminal",
+   "путь": "/Applications/system_control_panel/Terminal.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Time Machine",
+   "путь": "/Applications/system_control_panel/Time Machine.app",
+   "папка": "system_control_panel",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Accelerate",
+   "путь": "/Applications/tools/Accelerate.app",
+   "папка": "tools",
+   "мб": 3,
+   "версия": "4.2.4",
+   "изменён": "2026-05-21",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Battle.net-Setup",
+   "путь": "/Applications/tools/Battle.net-Setup.app",
+   "папка": "tools",
+   "мб": 6,
+   "версия": "1.19.3.3219",
+   "изменён": "2026-06-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Outread",
+   "путь": "/Applications/tools/Outread.app",
+   "папка": "tools",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Speedtest",
+   "путь": "/Applications/tools/Speedtest.app",
+   "папка": "tools",
+   "мб": 20,
+   "версия": "1.27",
+   "изменён": "2026-02-09",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Spritz",
+   "путь": "/Applications/tools/Spritz.app",
+   "папка": "tools",
+   "мб": 5,
+   "версия": "0.2",
+   "изменён": "2025-08-06",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Time Machine",
+   "путь": "/Applications/tools/Time Machine.app",
+   "папка": "tools",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-18",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "qBittorrent",
+   "путь": "/Applications/tools/qBittorrent.app",
+   "папка": "tools",
+   "мб": 94,
+   "версия": "5.2.3",
+   "изменён": "2026-07-07",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "rto-proxy",
+   "путь": "/Applications/tools/rto-proxy.app",
+   "папка": "tools",
+   "мб": 145,
+   "версия": "0.2.3",
+   "изменён": "2017-05-28",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "uTorrent Web",
+   "путь": "/Applications/tools/uTorrent Web.app",
+   "папка": "tools",
+   "мб": 33,
+   "версия": "1.4.0",
+   "изменён": "2024-08-03",
+   "похоже_на_ии": false
+  },
+  {
+   "имя": "Claude Code URL Handler",
+   "путь": "/Users/vasyaevdokimov/Applications/Claude Code URL Handler.app",
+   "папка": "—",
+   "мб": 0,
+   "версия": "—",
+   "изменён": "2026-08-26",
+   "похоже_на_ии": true
+  }
+ ],
+ "крупные_каталоги": [
+  {
+   "путь": "/Users/vasyaevdokimov/Library",
+   "мб": 25708
+  },
+  {
+   "путь": "/Users/vasyaevdokimov/repos",
+   "мб": 8873
+  },
+  {
+   "путь": "/Users/vasyaevdokimov/Pictures",
+   "мб": 2419
+  },
+  {
+   "путь": "/Users/vasyaevdokimov/Documents",
+   "мб": 631
+  }
+ ],
+ "brew_формул": 154,
+ "brew_приложений": 4
+}

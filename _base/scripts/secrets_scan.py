@@ -37,7 +37,13 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _roots import resolve_roots  # noqa: E402
 BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
-BASE = Path.home() / "Documents" / "base-repo"
+# 🔴 БЫЛО: `Path.home() / "Documents" / "base-repo"` — путь, устаревший
+# после переезда системы в `~/repos/`. Строка стояла СРАЗУ ПОСЛЕ вызова
+# `resolve_roots()`, то есть отменяла правильный механизм, стоящий рядом.
+# Скрипт падал `FileNotFoundError` и ронял закрытие батча любой репы.
+# Найдено 04.09.2026 — тот же класс, что `recovery_kits` → `recovery-kits`
+# в то же утро: переезд доехал до диска и не доехал до тех, кто ссылается.
+BASE = BASE_REPO
 
 # Сигнатуры значений. Ключ — что это, значение — как выглядит.
 SIGNATURES: dict[str, re.Pattern] = {

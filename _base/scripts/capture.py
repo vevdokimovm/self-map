@@ -61,6 +61,10 @@ CLASS_BOARD = REPO / "reports" / "incidents" / "PITFALLS.md"
 WATCHLOG = REPO / "WATCHLOG.md"
 
 TODAY = dt.date.today().isoformat()
+# 🔴 Время наравне с датой — заказ владельца 03.09.2026 21:29. За сутки
+# заводится до десяти карточек; по одной дате их порядок не восстановить,
+# а порядок находок и есть ход разбора (`00-infrastructure/94` §3).
+STAMP = f"{TODAY} {dt.datetime.now():%H:%M}"
 
 
 # --------------------------------------------------------------------------- #
@@ -189,7 +193,7 @@ def watchlog_line(ident: str, title: str, rule: str, link: str, dry: bool) -> No
     if anchor not in txt:
         print("  ! §4 в WATCHLOG не найден — строка не поставлена", file=sys.stderr)
         return
-    line = f"\n- **{TODAY}** — `{ident}` {title}. {rule or 'Правило — в карточке.'} → `{link}`\n"
+    line = f"\n- **{STAMP}** — `{ident}` {title}. {rule or 'Правило — в карточке.'} → `{link}`\n"
     if dry:
         print(f"  [dry] в WATCHLOG §4:{line}")
         return
@@ -224,7 +228,7 @@ def make_card(kind: str, args) -> None:
     num = next_number(prefix, sources)
     ident = f"{prefix}-{num:03d}"
     card = (
-        f"\n{level} {ident} — {args.title} ({TODAY})\n\n"
+        f"\n{level} {ident} — {args.title} ({STAMP})\n\n"
         f"- **Симптом.** {args.symptom or '[что увидели, как проявилось]'}\n\n"
         f"- **Корень.** {args.root_cause or '[настоящая причина, а не поверхностная]'}\n\n"
         f"- **Правило.** {args.rule or '[что делать впредь — одной фразой]'}\n\n"
@@ -304,7 +308,7 @@ def bump_class(args) -> None:
     CLASS_BOARD.write_text(txt, encoding="utf-8")
     print(f"✓ {args.title}: {old} → {new} повторов")
     if args.case:
-        append(CLASS_BOARD, f"\n- **{TODAY}** — {args.case}\n", args.dry)
+        append(CLASS_BOARD, f"\n- **{STAMP}** — {args.case}\n", args.dry)
         print("✓ случай дописан строкой")
     else:
         print("  ! случай строкой не дописан — счётчик без случая бесполезен, добавь --case")

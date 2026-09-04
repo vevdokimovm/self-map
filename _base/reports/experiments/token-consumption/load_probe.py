@@ -51,39 +51,44 @@ def probe(path):
     return rows
 
 
-logs = sorted(LOGDIR.rglob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)[:6]
-allrows = []
-print("ЛОГИ:")
-for p in logs:
-    r = probe(p)
-    if r:
-        print(f"  {len(r):5} реплик  {r[0][0]:%m-%d %H:%M}…{r[-1][0]:%m-%d %H:%M}  {p.parent.name[-28:]}/{p.name[:8]}")
-        allrows += r
+def _main_body() -> None:
+    logs = sorted(LOGDIR.rglob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)[:6]
+    allrows = []
+    print("ЛОГИ:")
+    for p in logs:
+        r = probe(p)
+        if r:
+            print(f"  {len(r):5} реплик  {r[0][0]:%m-%d %H:%M}…{r[-1][0]:%m-%d %H:%M}  {p.parent.name[-28:]}/{p.name[:8]}")
+            allrows += r
 
-print(f"\nВСЕГО реплик с задержкой: {len(allrows)}")
-if not allrows:
-    raise SystemExit("нет данных")
+    print(f"\nВСЕГО реплик с задержкой: {len(allrows)}")
+    if not allrows:
+        raise SystemExit("нет данных")
 
-byhour = defaultdict(list)
-for ts, dt, out in allrows:
-    byhour[ts.hour].append((dt, out))
+    byhour = defaultdict(list)
+    for ts, dt, out in allrows:
+        byhour[ts.hour].append((dt, out))
 
-print("\nЗАДЕРЖКА ПО ЧАСАМ (UTC). с/ток — нормировано на объём выхода:")
-print(f"{'час':>4} {'реплик':>7} {'медиана с':>10} {'медиана с/1к ток':>18}")
-norm = {}
-for h in sorted(byhour):
-    v = byhour[h]
-    if len(v) < 8:
-        continue
-    med = statistics.median(d for d, _ in v)
-    per = [d / (o / 1000) for d, o in v if o > 50]
-    medper = statistics.median(per) if per else float("nan")
-    norm[h] = medper
-    print(f"{h:>4} {len(v):>7} {med:>10.1f} {medper:>18.1f}")
+    print("\nЗАДЕРЖКА ПО ЧАСАМ (UTC). с/ток — нормировано на объём выхода:")
+    print(f"{'час':>4} {'реплик':>7} {'медиана с':>10} {'медиана с/1к ток':>18}")
+    norm = {}
+    for h in sorted(byhour):
+        v = byhour[h]
+        if len(v) < 8:
+            continue
+        med = statistics.median(d for d, _ in v)
+        per = [d / (o / 1000) for d, o in v if o > 50]
+        medper = statistics.median(per) if per else float("nan")
+        norm[h] = medper
+        print(f"{h:>4} {len(v):>7} {med:>10.1f} {medper:>18.1f}")
 
-if len(norm) >= 3:
-    lo, hi = min(norm, key=norm.get), max(norm, key=norm.get)
-    print(f"\nразмах нормированной задержки: час {lo} = {norm[lo]:.1f} с/1к  ·  "
-          f"час {hi} = {norm[hi]:.1f} с/1к  ·  отношение ×{norm[hi]/norm[lo]:.2f}")
-    print("🔴 отношение близко к 1 — сигнала нагрузки в этих данных нет;")
-    print("   отношение заметно больше 1 — фактор есть, но подтверждать надо на большем ряде.")
+    if len(norm) >= 3:
+        lo, hi = min(norm, key=norm.get), max(norm, key=norm.get)
+        print(f"\nразмах нормированной задержки: час {lo} = {norm[lo]:.1f} с/1к  ·  "
+              f"час {hi} = {norm[hi]:.1f} с/1к  ·  отношение ×{norm[hi]/norm[lo]:.2f}")
+        print("🔴 отношение близко к 1 — сигнала нагрузки в этих данных нет;")
+        print("   отношение заметно больше 1 — фактор есть, но подтверждать надо на большем ряде.")
+
+# 🔴 Гвард добавлен 04.09.2026 — `102-debugging-discipline.md` §3а.
+if __name__ == "__main__":
+    _main_body()

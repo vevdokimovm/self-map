@@ -55,7 +55,10 @@ BLOCK_RE = re.compile(
 )
 LINE_RE = re.compile(
     r"^>\s*\*\*Сейчас:\*\*\s*`v(?P<version>\d+\.\d+\.\d+)`"
-    r"\s*·\s*(?P<date>\d{4}-\d{2}-\d{2})"
+    # 🔴 Время ОПЦИОНАЛЬНО: с 03.09.2026 система пишет `ГГГГ-ММ-ДД ЧЧ:ММ`,
+    # но записи, сделанные до этого, законны и нарушением не становятся
+    # (тот же принцип, что «легаси принимается целиком» в стандарте `43`).
+    r"\s*·\s*(?P<date>\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)"
     r"\s*·\s*(?P<summary>.+?)\s*$",
     re.MULTILINE,
 )
@@ -123,8 +126,26 @@ def summary_at_head(root: Path) -> str | None:
     return previous.summary if previous else None
 
 
+def repo_class(root: Path) -> str:
+    """Класс репы из `.repo-class`; пусто, если файла нет."""
+    path = root / ".repo-class"
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
 def check(root: Path, staged_mode: bool) -> list[str]:
     problems: list[str] = []
+
+    # 🔴 02.09.2026. Гейт не знал про классы вовсе и требовал служебный блок
+    # «Сейчас: v1.1.2 · Пересборка: архив содержал устаревший канон» в README
+    # спецрепы профиля — то есть на публичной странице найма, которую читает
+    # рекрутёр. Владелец увидел это в браузере раньше, чем любая проверка.
+    # STATUS существует, чтобы ВЛАДЕЛЕЦ за десять секунд понял состояние репы;
+    # у витрины человека читатель другой, и внутренняя версия ему не адресована.
+    if repo_class(root) == "profile":
+        return []
 
     version_text = read_text(root, VERSION_FILE)
     if version_text is None:
@@ -205,7 +226,11 @@ def changelog_summary(root: Path) -> str | None:
     if not text:
         return None
     for line in text.splitlines():
-        m = re.match(r"^##\s*\[[^\]]+\]\s*[—-]\s*\d{4}-\d{2}-\d{2}\s*[—-]\s*(.+?)\s*$", line)
+        # Время опционально — см. `LINE_RE`. Без `(?:...)?` заголовок со
+        # временем не распознавался бы вовсе, и гейт молча брал бы заголовок
+        # СЛЕДУЮЩЕЙ секции: ложь тем опаснее, что выглядит успехом.
+        m = re.match(r"^##\s*\[[^\]]+\]\s*[—-]\s*\d{4}-\d{2}-\d{2}"
+                     r"(?:\s+\d{2}:\d{2})?\s*[—-]\s*(.+?)\s*$", line)
         if m:
             return re.sub(r"\s*\((?:MAJOR|MINOR|PATCH)\)\s*$", "", m.group(1)).strip()
     return None

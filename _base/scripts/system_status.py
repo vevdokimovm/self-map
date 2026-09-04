@@ -60,6 +60,7 @@ import datetime as dt
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 # Корень определяется общим модулем: скрипт может быть запущен и из базы,
@@ -86,7 +87,34 @@ THRESHOLDS = {
     # Медиана промежутка между батчами — 13 мин, девятая доля — 82 (timing.py,
     # 208 замеров). 120 взято заметно выше, чтобы длинный честный батч
     # не поднимал ложную тревогу: ложная тревога дороже позднего замечания.
+    # Порог 1: одна репа за потолком — уже повод. `01-repo-standard` §4
+    # называет 500 МБ жёстким, потому что выше Claude не берёт архив целиком,
+    # то есть репа перестаёт быть читаемой машиной как единое целое.
+    "реп за жёстким потолком": 1,
+    # Порог 1: две копии одной репы — уже расхождение, вопрос только когда
+    # оно проявится. Результат сверки начинает зависеть от того, в какой
+    # каталог зашли (`SYN-017`).
+    "реп с копиями": 1,
     "минут тишины": 120,
+    # Крупный транскрипт стирается сам через 30 дней, и продлить срок нельзя —
+    # места на диске нет (99-claude-code-sessions.md §4). Порог 1: одна долгая
+    # вахта на грани — уже повод вынуть из неё ценное в репу, пока она есть.
+    "сессий на грани удаления": 1,
+    # 🔴 Порог 7, а не 1: неделя без разбора — обычная жизнь (батчи бывают
+    # механические, и это законно). Восемь дней подряд — уже затор, и именно
+    # столько очередь простояла незамеченной (`PIT-195`). Порог 1 давал бы
+    # красное каждый день, когда работали над гейтами, — то есть всегда,
+    # а всегда красное перестают читать (`69` §4з).
+    "дней без разбора переписи": 7,
+    # 🔴 Порог 1 и без вариантов: одна публичная репа вне `MIRRORS` — это
+    # один массовый прогон до служебного канона в витрине (`PIT-196`).
+    # Здесь «редко и не страшно» не работает: цена одного случая — утечка
+    # содержимого наружу, и она необратима.
+    "публичных реп вне защиты": 1,
+    # Порог 1: скилл, которого нет в карте, вахта не вспомнит — а карта
+    # заведена ровно для того, чтобы вспоминала. Один пропущенный делает
+    # её ложно полной, и это хуже её отсутствия.
+    "скиллов вне карты": 1,
 }
 
 # 🔴 ОБРАТНЫЕ ПОРОГИ: тревога при значении НИЖЕ порога, а не выше.
@@ -214,6 +242,154 @@ def batch_silence() -> tuple[int, list[str]]:
     return minutes, [f"последний батч {max(moments):%d.%m %H:%M}"]
 
 
+def repo_copies() -> tuple[int, list[str]]:
+    """Реп, существующих более чем в одном экземпляре на диске.
+
+    🔴 ПОВОД — `ROADMAP`: 21.08.2026 контрольная сверка нашла, что **ни одна
+    из пяти закрытых реп не имеет единственной копии**; у `mission-control`
+    их было пять, версии от 0.25.0 до 1.12.0. Вывод был: «`SYN-017` оказался
+    не особенностью одной репы, а свойством системы».
+
+    Замер 04.09.2026 показал **ноль**: миграция в `~/repos` проблему решила.
+    Порог заведён не как чистка, а как сторож — чтобы возврат был замечен
+    сразу, а не через месяц расхождений.
+
+    🔴 КОПИЯ ОПОЗНАЁТСЯ ПО ПРИЗНАКУ РЕПЫ, А НЕ ПО ИМЕНИ. Первый прогон
+    считал тёзок и дал **13 ложных**: `~/repos/business` против
+    `personal-finance-dss/knowledge/business` — подкаталог, а не копия.
+    Признак: каталог содержит `.repo-id` или `VERSION` (`PIT-183`).
+
+    🔴 ЧЕГО НЕ ЛОВИТ: копию вне домашнего каталога, копию глубже четырёх
+    уровней и копию под другим именем — переименованный экземпляр
+    не опознаётся ничем, кроме содержимого.
+    """
+    SKIP = {".Trash", "node_modules", ".venv", "Library", ".git", "_base",
+            "__pycache__", ".cache"}
+    try:
+        names = {p.name for p in REPOS.iterdir() if p.is_dir()}
+    except OSError:
+        return -1, ["корень реп недоступен"]
+
+    found: dict[str, list[Path]] = {}
+
+    def walk(d: Path, depth: int = 0) -> None:
+        if depth > 4:
+            return
+        try:
+            entries = list(d.iterdir())
+        except (OSError, PermissionError):
+            return
+        for e in entries:
+            if not e.is_dir() or e.is_symlink() or e.name in SKIP:
+                continue
+            if e.name in names and ((e / ".repo-id").is_file()
+                                    or (e / "VERSION").is_file()):
+                found.setdefault(e.name, []).append(e)
+            walk(e, depth + 1)
+
+    walk(Path.home())
+    multi = {k: v for k, v in found.items() if len(v) > 1}
+    detail = []
+    for k, v in sorted(multi.items()):
+        where = ", ".join(str(p).replace(str(Path.home()), "~") for p in v[:3])
+        detail.append(f"{k}: {len(v)} экз. — {where}")
+    return len(multi), detail
+
+
+def heavy_repos() -> tuple[int, list[str]]:
+    """Сколько реп перевалило НАШ жёсткий потолок 500 МБ.
+
+    🔴 ЗАЧЕМ ОТДЕЛЬНО ОТ `growth_forecast`. Тот считает **прогноз для базы**
+    по ряду размеров её архивов — то есть отвечает «когда упрёмся».
+    Здесь вопрос другой: **кто уже упёрся**, по всем 66 репам. Прогноз
+    и факт — разные утверждения, и прогноз о базе ничего не говорит
+    о `self-map`.
+
+    🔴 ПОВОД — ЗАМЕР 04.09.2026, а не предположение. Аудитор приёмки показал,
+    что `self-map/reports` вырос на 5303 файла; `git_limits_check` подтвердил
+    **1018 МБ при потолке 500**. Порог существовал (`01-repo-standard` §4),
+    инструмент существовал — но в ЕЖЕДНЕВНУЮ проверку не входил, и репа
+    висела за потолком, пока её не нашли случайно.
+
+    Первый прогон нашёл не одну репу, а **семь**: self-map 1110, edu-base 767,
+    academic-portfolio 738, it-base 720, personal-finance-dss 617,
+    health-vault 596, portrait-of-taste 503.
+
+    ЦЕНА ИЗМЕРЕНА: обход 66 реп — **15.4 с**. Дорого для проверки, которую
+    зовут между батчами, поэтому результат кэшируется на сутки: размер репы
+    за час не меняется настолько, чтобы это стоило пятнадцати секунд каждый раз.
+
+    🔴 СЧИТАЕТСЯ ВЕС АРХИВА, А НЕ ВЕС НА ДИСКЕ. Первая редакция мерила диск —
+    и объявила тяжёлыми **семь** реп. Проверка показала, что это ложная
+    тревога на всех семи:
+
+        self-map:             диск 1110 МБ · в архив пойдёт 245 МБ
+        personal-finance-dss: диск  617 МБ · в архив пойдёт 104 МБ
+
+    Причина: порог 500 МБ существует ради одного — **Claude не берёт архив
+    целиком**. А `pack_release.py` в архив не кладёт `node_modules`, `.venv`,
+    `dist`, `__pycache__` и импортированные изображения. Вес на диске
+    к этому порогу отношения не имеет.
+
+    🔴 Это ровно тот класс, что нашёлся часом раньше в `acceptance_audit.py`:
+    **инструмент проверки принёс свой счёт вместо счёта проверяемого — и стал
+    измерять себя.** Дважды за один батч, разными путями: там сравнивались
+    определения «файла в репе», здесь — определения «веса репы».
+
+    Набор исключений берётся у `pack_release`, а не копируется: копия
+    разошлась бы на первой же правке упаковщика (`PIT-178`).
+
+    🔴 ЧЕГО НЕ ЛОВИТ: почему репа тяжёлая. Разбирает `git_limits_check.py`.
+    И не ловит вес НА ДИСКЕ — он тоже важен (место кончается), но это другой
+    вопрос и другой порог, которого пока нет.
+    """
+    import json
+    import time
+
+    HARD = 500 * 2**20
+    cache = BASE_REPO / "reports" / ".repo-sizes-cache.json"
+    now = time.time()
+    if cache.is_file():
+        try:
+            data = json.loads(cache.read_text(encoding="utf-8"))
+            if now - data.get("снято", 0) < 86400:
+                big = data["тяжёлые"]
+                return len(big), [f"{m:.0f} МБ — {n}" for n, m in big]
+        except (OSError, ValueError, KeyError):
+            pass                    # кэш битый — считаем заново, это не отказ
+
+    # Исключения СПРАШИВАЮТСЯ у упаковщика — он и решает, что поедет в архив.
+    sys.path.insert(0, str(BASE_REPO / "scripts"))
+    try:
+        from pack_release import JUNK_DIRS, JUNK_NAMES
+    except Exception:                                 # noqa: BLE001
+        return -1, ["упаковщик не отвечает — вес архива не посчитать"]
+
+    big = []
+    for repo in sorted(REPOS.iterdir()):
+        if not repo.is_dir():
+            continue
+        total = 0
+        for f in repo.rglob("*"):
+            if f.is_symlink() or not f.is_file():
+                continue
+            if set(f.parts) & JUNK_DIRS or f.name in JUNK_NAMES:
+                continue
+            try:
+                total += f.stat().st_size
+            except OSError:
+                continue
+        if total > HARD:
+            big.append((repo.name, total / 2**20))
+    big.sort(key=lambda x: -x[1])
+    try:
+        cache.write_text(json.dumps({"снято": now, "тяжёлые": big},
+                                    ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass                        # без кэша инструмент работает, просто дольше
+    return len(big), [f"{m:.0f} МБ — {n}" for n, m in big]
+
+
 def growth_forecast() -> tuple[int, list[str]]:
     """Через сколько дней репа упрётся в жёсткий порог размера.
 
@@ -298,14 +474,208 @@ def broken_archives() -> tuple[int, list[str]]:
     return 0, []
 
 
+def sessions_expiring() -> tuple[int, list[str]]:
+    """Крупные транскрипты, которым осталось меньше недели до автоудаления.
+
+    Claude Code сам стирает сессии старше `cleanupPeriodDays` (дефолт 30).
+    Продлить срок нельзя — при темпе 70 МБ в день и 7.4 ГБ свободного диска
+    даже 180 дней не умещаются (`00-infrastructure/99-claude-code-sessions.md` §4).
+    Значит остаётся одно: предупредить, пока ценное ещё можно вынуть в репу.
+
+    🔴 Считаются только КРУПНЫЕ сессии (≥10 МБ). Мелкие истекают постоянно,
+    это норма, и тревога на них была бы шумом, который научит её не читать.
+    Крупная сессия — долгая вахта: разборы, отменённые решения, обоснования.
+    В `WATCHLOG` попадает решение, в транскрипт — путь к нему.
+    """
+    import json as _json
+    projects = Path.home() / ".claude" / "projects"
+    if not projects.is_dir():
+        return 0, []
+    period = 30
+    for cfg in (Path.home() / ".claude" / "settings.json",
+                BASE_REPO / ".claude" / "settings.json"):
+        try:
+            v = _json.loads(cfg.read_text()).get("cleanupPeriodDays")
+        except (OSError, ValueError):
+            continue
+        if isinstance(v, int) and v > 0:
+            period = v
+    now = time.time()
+    doomed = []
+    for f in projects.glob("*/*.jsonl"):
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        mb = st.st_size / 1024 / 1024
+        if mb < 10:
+            continue
+        left = period - (now - st.st_mtime) / 86400
+        if left <= 7:
+            doomed.append((left, mb, f))
+    doomed.sort()
+    lines = [f"{mb:.0f} МБ, осталось {left:.0f} дн: {f.parent.name[:44]}"
+             for left, mb, f in doomed[:5]]
+    return len(doomed), lines
+
+
+# 🔴 ГДЕ МАССОВОСТЬ НОРМАЛЬНА, А ГДЕ ОНА ПРИЗНАК ДЕФЕКТА ПРОВЕРКИ.
+#
+# Заведено 04.09.2026 после того, как ОДИН класс ошибки сработал трижды
+# за сутки (`PIT-183`): `acceptance_audit` объявил выросшими все 19 реп,
+# `heavy_repos` — 7 за потолком, замер копий — 13 с копиями. Все три раза
+# расхождения не было: инструмент приносил своё определение вместо свойства
+# проверяемого и в итоге мерил себя.
+#
+# Различающий признак был выведен и записан — и не сработал бы сам, потому
+# что правило, которое надо помнить, не работает (`PIT-163`). Здесь оно
+# становится исполнителем: проверка, нашедшая расхождение почти у всех,
+# печатает подсказку прямо в момент находки.
+#
+# 🔴 НО МАССОВОСТЬ БЫВАЕТ ЗАКОННОЙ, и это не исключение, а частый случай:
+# любая правка базы делает отставшими ВСЕ 57 реп разом — так устроена
+# раздача. Подсказка на такой проверке была бы шумом, а шум учит не читать
+# вывод. Поэтому каждая проверка объявляет это сама.
+MASS_IS_NORMAL = {
+    "отставших от канона",      # правка базы делает отставшими всех сразу
+    "просроченных задач",       # накапливаются, к населению не привязаны
+    "минут тишины",             # не доля от населения вовсе
+    "дней до порога размера",   # прогноз, не счёт
+    "дней без архива",          # то же
+    "сессий на грани удаления", # своё население, не репы
+}
+
+# Население, с которым сравнивается значение. None — сравнивать не с чем.
+def _population(label: str) -> int | None:
+    if label in ("реп за жёстким потолком", "реп с копиями"):
+        try:
+            return len([d for d in REPOS.iterdir() if d.is_dir()])
+        except OSError:
+            return None
+    return None
+
+
+def census_stalled() -> tuple[int, list[str]]:
+    """Сколько дней очередь переписи метода стоит без движения.
+
+    🔴 ПОВОД — `PIT-195`. Перепись `scan_lessons.py` отвечает «что читать»
+    и отвечала верно **восемь дней**, пока очередь стояла: 27.08 разобран
+    первый кандидат, дальше ноль до 04.09. Простой был невидим — ни одна
+    проверка не считала, сколько разобрано за период.
+
+    Корень назван там же: механика отчитывается числами («821 дубль снят»),
+    подъём урока — одним абзацем в чужом документе. При выборе, чем закрыть
+    батч, механика выигрывает не по важности, а по видимости результата.
+    Здесь простой становится числом — то есть уравнивается в видимости.
+
+    🔴 ГРАНИЦА: считается движение счётчика `разобрано`, а не польза от него.
+    Разбор, признанный «покрыто, поднимать нечего», двигает счётчик так же,
+    как поднятый раздел, — и это верно: «уже покрыто» такой же результат
+    прохода (`ROADMAP` §P2). Отписку гейт не отличит, как и `check_campaign_log`.
+    """
+    journal = BASE_REPO / "05-infra-synthesis-lab/tools/census-progress.tsv"
+    if not journal.is_file():
+        return 0, []
+    rows = [l.split("\t") for l in
+            journal.read_text(encoding="utf-8").splitlines()[1:] if l.strip()]
+    if not rows:
+        return 0, []
+    import datetime
+    last_moved, last_seen = None, None
+    prev = None
+    for r in rows:
+        if len(r) < 3:
+            continue
+        last_seen = r[0]
+        if prev is None or int(r[1]) > prev:
+            last_moved = r[0]
+        prev = int(r[1])
+    queue = int(rows[-1][2])
+    if queue == 0 or last_moved is None:
+        return 0, []
+    days = (datetime.date.today() - datetime.date.fromisoformat(last_moved)).days
+    if days == 0:
+        return 0, []
+    return days, [f"очередь ≥400: {queue} · последний разбор {last_moved}"
+                  f" · последний замер {last_seen}"]
+
+
+def public_unprotected() -> tuple[int, list[str]]:
+    """Публичные репы, которых нет в `MIRRORS` деплойера.
+
+    🔴 ПОВОД — `PIT-196`. Две публичные репы (`vevdokimovm` и его сайт)
+    отсутствовали в списке защищённых, и массовый режим залил бы в них
+    `_base/` — служебный канон в витрину. Ровно это случилось 08.08.2026
+    с публичной `finpilot`.
+
+    Команда сверки **уже стояла** в комментарии над списком и не
+    запускалась. Правило `PIT-196` требует, чтобы команда стала вызовом,
+    и вот он.
+
+    🔴 `gh` недоступен — возвращается НОЛЬ и пустой список, то есть порог
+    молчит. Это сознательный выбор: тревожить владельца отсутствием сети
+    нечем, а объявить «всё хорошо» при недоступном источнике инструмент
+    не может — он и не объявляет, просто молчит. Развёрнутый ответ
+    с явным «проверка НЕ ВЫПОЛНЕНА» даёт `visibility_check.py`.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        import visibility_check as vc
+    except ImportError:
+        return 0, []
+    gh = vc.public_on_github()
+    if gh is None:
+        return 0, []
+    try:
+        mr = vc.mirrors_in_deploy(
+            (BASE_REPO / "templates/deploy.sh").read_text(
+                encoding="utf-8", errors="replace"))
+    except OSError:
+        return 0, []
+    bad = sorted(gh - mr)
+    return len(bad), [f"{n} — публична, но не в MIRRORS: массовый режим "
+                      f"зальёт в неё _base/" for n in bad]
+
+
+def skills_uncharted() -> tuple[int, list[str]]:
+    """Скиллы на диске, которых нет в карте `/auto` §2д.
+
+    🔴 ПОВОД, 04.09.2026. Карта заведена 29.08 со словами «скиллов стало
+    девять за один день, и без списка вахта их не вспомнит». Через неделю
+    выяснилось, что **`/machine` в ней не было вовсе** — скилл существовал
+    с 02.09, а карта про него не знала.
+
+    Список, который ведут руками, стареет — даже список, заведённый против
+    забывания (`PIT-097`: список — намерение, свойство объекта — факт).
+    Здесь свойство объекта — **каталог в `.claude/skills/`**.
+    """
+    import re
+    skills_dir = BASE_REPO / ".claude/skills"
+    card = skills_dir / "auto/SKILL.md"
+    if not skills_dir.is_dir() or not card.is_file():
+        return 0, []
+    on_disk = {d.name for d in skills_dir.iterdir() if (d / "SKILL.md").is_file()}
+    charted = set(re.findall(r"^\|\s*\*\*`/([a-z-]+)`\*\*",
+                             card.read_text(encoding="utf-8", errors="replace"), re.M))
+    missing = sorted(on_disk - charted)
+    return len(missing), [f"{n} — есть на диске, нет в карте `/auto` §2д"
+                          for n in missing]
+
+
 CHECKS = (
+    ("скиллов вне карты", skills_uncharted),
+    ("публичных реп вне защиты", public_unprotected),
+    ("дней без разбора переписи", census_stalled),
     ("отставших от канона", canon_lag),
     ("повреждённых архивов", broken_archives),
     ("дней до порога размера", growth_forecast),
+    ("реп за жёстким потолком", heavy_repos),
+    ("реп с копиями", repo_copies),
     ("минут тишины", batch_silence),
     ("просроченных задач", overdue_tasks),
     ("дней без архива", archive_age),
     ("хуков без +x", hooks_executable),
+    ("сессий на грани удаления", sessions_expiring),
 )
 
 
@@ -342,7 +712,45 @@ def selftest() -> bool:
                for v, l, inv, expected in checks):
         return False
     # И сами разряды не должны пересекаться: метка не может быть в обоих.
-    return not (set(THRESHOLDS) & set(LOWER_IS_WORSE))
+    if set(THRESHOLDS) & set(LOWER_IS_WORSE):
+        return False
+
+    # 🔴 У КАЖДОЙ ПРОВЕРКИ ОБЯЗАН БЫТЬ ПОРОГ. Без этой строки новая проверка,
+    # добавленная в CHECKS без записи в THRESHOLDS, печатала бы значение
+    # и молчала бы навсегда — «проверка без порога не проверка, а строка»
+    # (поймано на хуках 29.08.2026, и повторилось бы на счётчике переписи).
+    labels = {lab for lab, _ in CHECKS}
+    if labels - set(THRESHOLDS) - set(LOWER_IS_WORSE):
+        return False
+
+    # 🔴 Счётчик переписи проверяется НА СВОИХ ДАННЫХ, а не на литералах
+    # (`PIT-195`): движение счётчика `разобрано` должно гасить тревогу,
+    # а стоящая непустая очередь — поднимать.
+    import tempfile, datetime, io, contextlib
+    global BASE_REPO
+    real = BASE_REPO
+    y = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
+    cases = (
+        # (строки журнала, ожидаем тревогу)
+        ((f"{y}\t5\t9\t100", f"{datetime.date.today()}\t7\t9\t100"), False),
+        ((f"{y}\t5\t9\t100", f"{datetime.date.today()}\t5\t9\t100"), True),
+        ((f"{y}\t5\t0\t100", f"{datetime.date.today()}\t5\t0\t100"), False),
+    )
+    ok = True
+    try:
+        for lines, expect in cases:
+            with tempfile.TemporaryDirectory() as d:
+                j = Path(d) / "05-infra-synthesis-lab/tools"
+                j.mkdir(parents=True)
+                (j / "census-progress.tsv").write_text(
+                    "дата\tразобрано\tочередь_400\tвсего\n" + "\n".join(lines) + "\n",
+                    encoding="utf-8")
+                BASE_REPO = Path(d)
+                days, _ = census_stalled()
+                ok &= bool(days) is expect
+    finally:
+        BASE_REPO = real
+    return ok
 
 
 def main() -> int:
@@ -379,6 +787,14 @@ def main() -> int:
             print(f"  🔴 {label}: {value}  (порог {sign} {limit})")
             for line in detail:
                 print(f"        · {line}")
+            # 🔴 Подсказка в момент находки, а не правило в документе.
+            pop = _population(label)
+            if (label not in MASS_IS_NORMAL and pop and value >= pop * 0.9):
+                print(f"        🔴 {value} из {pop} — расхождение почти у ВСЕХ.")
+                print("           Это чаще расхождение ОПРЕДЕЛЕНИЙ, чем состояния:")
+                print("           мир не меняется одновременно и одинаково "
+                      "(`PIT-183`).")
+                print("           Проверить, тем ли считается, ДО разбора находок.")
         elif a.all:
             print(f"  🟢 {label}: {value}" + (f"  (порог {limit})" if limit else ""))
 

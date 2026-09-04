@@ -1,0 +1,21 @@
+{
+  "skill": "tokens",
+  "runs_per_case": 3,
+  "note": "Негативы обязательны (37-skills-system.md §4б). Тонкая граница: скилл про ЗАМЕР расхода текущей сессии, а не про экономию токенов вообще и не про лимиты аккаунта. Вопрос 'как сэкономить' — это документ 49, а не этот скилл.",
+  "cases": [
+    { "prompt": "замер токенов", "should_trigger": true },
+    { "prompt": "сколько мы потратили за сессию", "should_trigger": true },
+    { "prompt": "сними срез сессии", "should_trigger": true },
+    { "prompt": "сколько контекста занято", "should_trigger": true },
+    { "prompt": "покажи состояние клода: модель, усилие, кэш", "should_trigger": true },
+    { "prompt": "был ли компакт и почём он обошёлся", "should_trigger": true },
+    { "prompt": "посчитай расход субагентов", "should_trigger": true },
+    { "prompt": "как сэкономить токены в длинной сессии", "should_trigger": false },
+    { "prompt": "почему ход стал дороже", "should_trigger": false },
+    { "prompt": "когда сбросится недельный лимит", "should_trigger": false },
+    { "prompt": "какую модель взять под эту задачу", "should_trigger": false },
+    { "prompt": "запусти агента repo-inventory", "should_trigger": false },
+    { "prompt": "объясни, что такое TTL кэша", "should_trigger": false },
+    { "prompt": "открой hypothesis.md", "should_trigger": false }
+  ]
+}

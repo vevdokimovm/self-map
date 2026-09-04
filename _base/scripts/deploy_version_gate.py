@@ -53,7 +53,12 @@ SPEC = "templates/deploy-SPEC.md"
 #
 # Признак копии: файл называется `deploy.sh` и лежит вне канона. Ищем там,
 # где они реально заводятся, не сканируя весь диск.
-SEARCH_ROOTS = ("~/repos", "~/Downloads", "~/Documents")
+# 🔴 `~/Developer` ДОБАВЛЕН, а не заменил `~/Downloads` (03.09.2026).
+# Артефакты системы переехали в `Developer`, но копия деплойера в `Downloads`
+# осталась: владелец запускает её оттуда годами, и перестать её проверять
+# значило бы вернуть `PIT-063` — вахта откатила единственный инструмент
+# публикации на 13 версий, потому что смотрела не туда.
+SEARCH_ROOTS = ("~/repos", "~/Developer", "~/Downloads", "~/Documents")
 
 
 def find_copies(canon: Path) -> list[Path]:
@@ -206,20 +211,92 @@ def check_copies(script: Path, canon: str) -> tuple[list[str], list[str]]:
     return fails, notes
 
 
+# 🔴 ЗАКРЫТЫЙ ПУНКТ — ТОЖЕ ИСТОРИЯ, хотя лежит в живом файле.
+# Замер 04.09.2026: подъём канона до 4.26.0 покрасил `ROADMAP.md:1360` —
+# строку «ЗАКРЫТО 04.09.2026 (deploy.sh v4.25.0, инвариант И18)». Это запись
+# о том, КАКАЯ версия закрыла пункт; она не устареет никогда, и «починка»
+# заменой номера превратила бы верный факт в неверный.
+#
+# Заморозка по имени файла (`FROZEN_SUFFIXES`) этот случай не ловит и не может:
+# `ROADMAP.md` живой файл целиком, а исторична в нём отдельная ВЕТКА. Признак
+# структурный — пункт помечен `- [x]`, и всё, что вложено под него до
+# следующего пункта верхнего уровня, относится к нему.
+ITEM_RE = re.compile(r"^\s{0,3}[-*] \[(.)\]")
+
+
+def closed_item_lines(text: str) -> set[int]:
+    """Номера строк, лежащих внутри ЗАКРЫТОГО (`- [x]`) пункта списка."""
+    inside: set[int] = set()
+    closed = False
+    for number, line in enumerate(text.splitlines(), 1):
+        m = ITEM_RE.match(line)
+        if m:
+            closed = m.group(1).lower() == "x"
+        elif line.strip() and not line.startswith((" ", "\t")):
+            closed = False           # вышли из блока пункта наружу
+        if closed:
+            inside.add(number)
+    return inside
+
+
 def check_mentions(root: Path, canon: str) -> list[str]:
-    """Живая документация не должна называть устаревший номер версии."""
+    """Живая документация не должна называть устаревший номер версии.
+
+    🔴 Два исключения, и оба структурные, а не списочные:
+    закрытый (`- [x]`) пункт — история, блок кода — **цитата**. Текст внутри
+    ``` показывают, а не утверждают: разбор дефекта обязан приводить строку
+    ДОСЛОВНО, иначе он теряет предмет. Тот же признак уже применён
+    в `links_check.py`.
+    """
     stale: list[str] = []
     for path in sorted(root.rglob("*.md")):
         rel = path.relative_to(root).as_posix()
         if rel.startswith(".") or is_frozen(rel):
             continue
-        for number, line in enumerate(
-            path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
-        ):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        historic = closed_item_lines(text)
+        fenced = False
+        for number, line in enumerate(text.splitlines(), 1):
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
+                continue
+            if fenced or number in historic:
+                continue
             for found in MENTION_RE.finditer(line):
                 if found.group(1) != canon:
                     stale.append(f"{rel}:{number}: назван v{found.group(1)}, канон v{canon}")
     return stale
+
+
+def selftest() -> int:
+    """Канарейка на границу «живое против закрытого»."""
+    cases = [
+        ("открытый пункт со старым номером",
+         "- [ ] чинить\n\n      сейчас `deploy.sh` v1.0.0\n", True),
+        ("закрытый пункт со старым номером",
+         "- [x] ЗАКРЫТО\n\n      закрыто в `deploy.sh` v1.0.0\n", False),
+        ("🔴 после закрытого пункта — снова живой текст",
+         "- [x] ЗАКРЫТО\n\n      было `deploy.sh` v1.0.0\n\n"
+         "## Раздел\n\nканон `deploy.sh` v1.0.0\n", True),
+        ("текущий номер не находка нигде",
+         "- [ ] живое\n\n      `deploy.sh` v9.9.9\n", False),
+        ("🔴 цитата в блоке кода — не утверждение",
+         "живое\n\n```\nбыло: deploy.sh v1.0.0\n```\n", False),
+        ("незакрытый блок кода не глотает остаток файла",
+         "```\ndeploy.sh v1.0.0\n```\n\nканон `deploy.sh` v1.0.0\n", True),
+    ]
+    ok = True
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        for name, text, expect in cases:
+            f = Path(d) / "probe.md"
+            f.write_text(text, encoding="utf-8")
+            got = bool(check_mentions(Path(d), "9.9.9"))
+            mark = "✅" if got == expect else "🔴"
+            print(f"   {mark} {name}: {'ловится' if got else 'молчит'}")
+            ok &= got == expect
+    print("selftest OK" if ok else "🔴 selftest ПРОВАЛЕН")
+    return 0 if ok else 1
 
 
 def fix_docs(root: Path, script: Path, canon: str) -> list[str]:
@@ -269,7 +346,11 @@ def main() -> int:
     parser.add_argument(
         "--sync-copies", action="store_true", help="разложить канон по копиям на диске"
     )
+    parser.add_argument("--selftest", action="store_true",
+                        help="проверить канарейку границы «живое против закрытого»")
     args = parser.parse_args()
+    if args.selftest:
+        return selftest()
     root = Path(args.root).resolve()
 
     canon, script = read_canon(root)

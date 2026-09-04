@@ -23,6 +23,63 @@ repo_arg() {
 case "${1:-}" in
 auth) echo "Logged in to github.com as testuser"; exit 0 ;;
 
+# 🔴 `api` ЗАВЕДЕНА 04.09.2026 — до этого её здесь НЕ БЫЛО, и стаб отвечал
+# на неё общим `exit 0` с пустым выводом. «Нет такого случая» выглядело
+# как «случай проверен и пуст»: предохранитель доставки в deploy.sh
+# три версии подряд считался протестированным, а на живом GitHub падал
+# на первой же новой репе (пустая репа отдаёт 404, а не пустой список).
+#
+# Отвечает как настоящий GitHub:
+#   · $GH_STORE/contents/<repo> есть        → JSON-массив из его строк;
+#   · bare-remote без коммитов              → 404 «This repository is empty.»
+#                                             И НЕНУЛЕВОЙ КОД — как боевой gh;
+#   · иначе                                 → корень дерева remote HEAD.
+api)
+  _path="${2:-}"
+  # 🔴 `--jq` ПРИМЕНЯЕТСЯ ПО-НАСТОЯЩЕМУ, а не игнорируется. Иначе стаб
+  # проверял бы не тот контракт: боевой `gh` отдаёт РЕЗУЛЬТАТ фильтра,
+  # и вся логика вызывающего написана под него. Стаб, отдающий сырой JSON,
+  # зеленел бы на коде, который в бою не работает.
+  _jq=""; _prev=""
+  for _a in "$@"; do [ "$_prev" = "--jq" ] && { _jq="$_a"; break; }; _prev="$_a"; done
+  emit() {           # печатает JSON, применяя фильтр, если он задан
+    if [ -n "$_jq" ]; then printf '%s' "$1" | jq -r "$_jq"; else printf '%s\n' "$1"; fi
+  }
+  case "$_path" in
+  repos/*/contents*)
+    _rest="${_path#repos/}"; _owner="${_rest%%/*}"; _rest="${_rest#*/}"
+    _name="${_rest%%/*}"
+    _list="$STORE/contents/$_name"
+    if [ -f "$_list" ]; then
+      _json='['; _first=1
+      while IFS= read -r _n; do
+        [ -z "$_n" ] && continue
+        [ "$_first" = 1 ] || _json="$_json,"
+        _json="$_json{\"name\":\"$_n\",\"type\":\"file\"}"
+        _first=0
+      done < "$_list"
+      emit "$_json]"
+      exit 0
+    fi
+    _bare="${REMOTE_BASE#file://}/$_name.git"
+    if [ -d "$_bare" ] && ! git -C "$_bare" rev-parse HEAD >/dev/null 2>&1; then
+      printf '{"message":"This repository is empty.","documentation_url":"https://docs.github.com/v3/repos/contents/#get-contents","status":"404"}\n' >&2
+      exit 1
+    fi
+    if [ -d "$_bare" ]; then
+      _json='['; _first=1
+      for _n in $(git -C "$_bare" ls-tree --name-only HEAD 2>/dev/null); do
+        [ "$_first" = 1 ] || _json="$_json,"
+        _json="$_json{\"name\":\"$_n\",\"type\":\"file\"}"
+        _first=0
+      done
+      emit "$_json]"
+      exit 0
+    fi
+    exit 1 ;;
+  esac
+  exit 0 ;;
+
 repo)
   case "${2:-}" in
   view)

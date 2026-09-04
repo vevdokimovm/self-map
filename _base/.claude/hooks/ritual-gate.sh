@@ -34,7 +34,8 @@ command -v python3 >/dev/null 2>&1 || exit 0
 problems=""
 
 # --- 1. Деплойер: версия против журнала, спеки и КОПИЙ на диске ---------------
-# Копии — главное: владелец запускает ~/Downloads/deploy.sh, а не канон в репе.
+# Копии — главное: владелец запускает копию (~/Developer или ~/Downloads),
+# а не канон в репе.
 # Именно так правка 4.17.1 не доехала до него 21.08.2026 (повтор №4 в PIT-G).
 if [ -f scripts/deploy_version_gate.py ] && [ -f templates/deploy.sh ]; then
   if ! out=$(python3 scripts/deploy_version_gate.py 2>&1); then
@@ -59,9 +60,23 @@ $(printf '%s' "$out" | grep -E '^\[FAIL\]' | head -6)
 fi
 
 # --- 3. VERSION поднята, а архива для неё нет --------------------------------
-# Правило владельца (память): каждый VERSION bump = zip в ~/Downloads.
+# Правило владельца: каждый VERSION bump = zip в папке артефактов.
+#
+# 🔴 ПУТЬ СПРАШИВАЕТСЯ, А НЕ ЗАШИТ — правлено 03.09.2026 23:45, и повод
+# показательный: артефакты переехали в `~/Developer` тем же вечером, пять
+# скриптов Python и `deploy.sh` были переведены на общий источник, а ХУК —
+# нет. Он остался искать в `~/Downloads`, не нашёл и заблокировал ход
+# сообщением «архива нет» при существующем архиве.
+#
+# То есть проверка, поставленная сторожить класс `PIT-G` («артефакт правлен,
+# обвязка нет»), сама этим классом и оказалась. Ложная тревога дороже
+# молчания: она обучает не читать вывод и тратит ход на разбор пустого.
+#
+# Источник один и тот же у shell и Python — `BASE_ARTIFACTS`, иначе способов
+# переопределить путь стало бы три (`PIT-178`).
+ARTIFACTS="${BASE_ARTIFACTS:-$HOME/Developer}"
 version="$(tr -d ' \t\r\n' < VERSION 2>/dev/null)"
-if [ -n "$version" ] && [ ! -f "$HOME/Downloads/base-repo-v${version}.zip" ]; then
+if [ -n "$version" ] && [ ! -f "$ARTIFACTS/base-repo-v${version}.zip" ]; then
   # Архив мог быть уже опубликован и удалён деплойером — тогда есть тег на GitHub.
   #
   # 🔴 Сетевой вызов внутри хука обязан иметь таймаут. Без него недоступная сеть
@@ -88,7 +103,7 @@ PY
   # лишний блок дешевле, чем пропущенный незакрытый батч.
   if [ "$tag_found" != "yes" ]; then
     problems="${problems}
-▸ VERSION=${version}, но архива ~/Downloads/base-repo-v${version}.zip нет
+▸ VERSION=${version}, но архива ${ARTIFACTS}/base-repo-v${version}.zip нет
   и тега v${version} на GitHub тоже нет.
 
   Собрать:  python3 scripts/pack_release.py"

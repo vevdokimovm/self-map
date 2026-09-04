@@ -60,7 +60,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _roots import resolve_roots  # noqa: E402
 BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
-DOWNLOADS = Path.home() / "Downloads"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _roots import artifacts_dir  # noqa: E402
+# Имя переменной сохранено: его читают ниже по коду, и переименование ради
+# красоты — правка без предмета. Значение теперь общее с остальными.
+DOWNLOADS = artifacts_dir()
 NAME_RE = re.compile(r"^(?P<repo>.+)-v(?P<version>\d+\.\d+\.\d+)\.zip$")
 
 

@@ -1,263 +1,311 @@
 #!/usr/bin/env python3
-"""Golden path — один шаг, а не ручное копирование 8-10 файлов с образца.
+"""new_repo.py — завести репу правильно с первого раза.
 
-ПОЧЕМУ ЭТОТ СКРИПТ ПОЯВИЛСЯ (27.08.2026, найдено ресёрчем индустрии —
-platform engineering: golden path = «инстанцировал шаблон, платформа сама
-завела реестрацию/пайплайн», а не «списал с соседнего сервиса руками»).
-Ручное копирование уже реально разъезжалось со стандартом: `finpilot` не имел
-`.repo-meta` до сегодняшнего дня, 12 реп несли description-«эссе» на 200-344
-символа. Скелет здесь собран по факту диска трёх недавно заведённых
-сателлитов (`business`, `quick-answers`, `independent-expert`), не по
-абстрактному минимуму `76-repo-classes.md` §1 — практика шире таблицы.
+ЗАКАЗ ВЛАДЕЛЬЦА 02.09.2026, дословно: «какие файлы, механизмы создать, чтобы
+ты перестал обсираться? Мы даже вроде гейты делали, и всё равно ошибки».
+И там же аналогия, которая объясняет причину точнее любого разбора:
 
-ЧТО НЕ ДЕЛАЕТ. Не пишет содержательный текст (MANIFEST §1, README-абзац) —
-это синтез, не подстановка; оставляет TODO с явной пометкой, кто и когда
-должен заполнить. Не трогает `repos-map.md` — тот всё равно проверяется
-`revision_check.py::check_repos_map_sync()` при следующей ревизии base-repo,
-писать туда одной строкой без описания зоны — то же самое, что не писать
-вообще (`76-repo-classes.md` §4.1, «упоминание не считается записью»).
+    «если сравнивать с ООП, то у тебя постоянно лагает функция конструктора…
+     как работать, если в самом начале утечки и сбои при создании объекта уже»
 
-ЗАПУСК
-    new_repo.py <имя> --class satellite --description "..." [--topics a,b,c]
-    new_repo.py <имя> --class temp --parent it-base --description "..."
-    new_repo.py <имя> --class infra --description "..."   (минимальный набор)
+🔴 ДИАГНОЗ, ИЗ КОТОРОГО ВЫРОС ЭТОТ СКРИПТ. Гейт `revision_check.py` содержит
+34 проверки и **ни одна не смотрит на `.repo-id`**. Причина структурная:
+гейт проверяет репу, которая УЖЕ существует и уже в системе. Момент создания
+он не покрывает вовсе — там ещё нечего проверять, репа заводится вручную
+по памяти, а память подводит.
+
+Живой случай 02.09.2026: репа `migration` заведена с `.repo-id` = случайный
+UUID вместо `vevdokimovm/migration`. Формат записан в `48-repo-identity.md`
+строкой 90 — я его не открыл. Гейт промолчал (не его область), деплой поймал
+уже на публикации: «архив уехал бы не в ту репу».
+
+**Вывод: правило, которое надо помнить при создании, — не механизм.
+Механизм — это скрипт, который создаёт сам.**
+
+ПРЕДУСЛОВИЯ (все до первой записи):
+  · имя репы задано, латиницей, строчными, через дефис;
+  · класс из восьми известных (`76-repo-classes.md` §1);
+  · такой репы ещё нет на диске;
+  · шаблон `.gitignore` в базе на месте.
+
+ПОСТУСЛОВИЯ (проверяются после создания):
+  · `.repo-id` содержит ровно `vevdokimovm/<имя>` — не UUID, не путь;
+  · `.repo-class` содержит заявленный класс;
+  · `VERSION` = 0.1.0;
+  · `.repo-meta` содержит `private=`;
+  · обязательный минимум файлов класса на месте;
+  · гейт ревизии даёт CLEAN на свежей репе.
+
+ИНВАРИАНТ: репа либо создана целиком и правильно, либо не создана вовсе.
+Половина файлов хуже, чем ничего: она выглядит рабочей.
 """
 from __future__ import annotations
 
 import argparse
-import datetime
+import re
+import shutil
+import subprocess
+import sys
+from datetime import date
 from pathlib import Path
 
-REPOS_DIR = Path.home() / "repos"
-GITIGNORE = """.DS_Store
-*.swp
-*~
-.idea/
-.vscode/
-__pycache__/
-*.pyc
-.env
-*.zip
-_local/
-"""
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _roots import resolve_roots  # noqa: E402
 
-FULL_CLASSES = {"core", "satellite", "temp", "product"}
+BASE_REPO, REPOS, _ = resolve_roots(__file__)
 
+# 🔴 Владелец GitHub — источник формата `.repo-id`. Записан здесь один раз,
+# чтобы не воспроизводиться по памяти при каждом заведении (`48` §90).
+OWNER = "vevdokimovm"
 
-def render_full(name: str, klass: str, desc: str, topics: str, today: str, parent: str | None) -> dict[str, str]:
-    class_line = f"temp:{parent}" if klass == "temp" and parent else klass
+CLASSES = {
+    "infra": ["README.md", "VERSION"],
+    "core": ["README.md", "VERSION", "ROADMAP.md", "TASKS.md", "START-HERE.md",
+             "CHANGELOG.md"],
+    "satellite": ["README.md", "VERSION", "ROADMAP.md", "CHANGELOG.md"],
+    "temp": ["README.md", "VERSION"],
+    "product": ["README.md", "VERSION", "CHANGELOG.md", "ROADMAP.md"],
+    "profile": ["README.md", "VERSION"],
+}
 
-    readme = f"""# {name} — Vasilii Evdokimov
-
-{desc}
-
-> Most documents are in Russian.
-
-## Status
-
-Скелет заведён {today} — см. `MANIFEST.md` для полного описания зоны
-ответственности и границ с соседними репами. Наполнение не начато.
-
-## Data & privacy note
-
-Приватный личный репозиторий. Секреты — пароли, ключи, токены, данные карт —
-сюда не попадают ни при каких условиях.
-
----
-
-**Contact:** vevdokimovm@gmail.com · GitHub: [@vevdokimovm](https://github.com/vevdokimovm)
-"""
-
-    start_here = f"""# START HERE — `{name}`
-
-**Класс:** `{klass}`
-**Состояние:** скелет, наполнение не начато
-
-## Что это
-
-TODO — одно-два предложения, что за репа и чем НЕ является. Заполнить при
-первом реальном наполнении, не оставлять как заглушку дольше одной сессии.
-
-## Порядок входа в сессию
-
-1. `WATCHLOG.md` §0 — где остановились
-2. `ROADMAP.md` — что дальше
-3. `_base/` — общие правила системы (зеркало `base-repo`, **не редактировать здесь**)
-
-## Правила
-
-Общесистемные правила наследуются из `_base/` — раздаётся `sync_base_local.py`.
-Планирование верхнего уровня — репа `mission-control`.
-"""
-
-    manifest = f"""# Манифест репы `{name}`
-
-## 1. Что это за репа — в трёх предложениях
-
-TODO — заполнить при первом реальном наполнении. Golden path генерирует
-только скелет; синтез смысла репы — работа человека/Claude на месте, не шаблона.
-
-**Класс:** `{klass}`
-**Видимость:** приватная
-**Версия на момент манифеста:** 0.1.0
-
-## 2. Описание для `.repo-meta` и GitHub
-
-```
-{desc}
-```
-
-**Теги:** `{topics}`
-
-## 3. Что внутри — по предмету, а не по каталогам
-
-TODO — таблица «раздел / файлов / что по существу» после первого наполнения.
-
-## 4. Классификация: что сюда идёт, а что нет
-
-TODO — граница с соседними репами, парой через «↔» (`76-repo-classes.md` §5).
-
-## 5. Тяжёлое: эталоны и выжимки
-
-TODO — если появятся медиа/сканы: эталон или расходное (`METHOD_IMAGES.md` §9).
-
-## 6. Связи с другими репами
-
-TODO.
-
-## 7. Состояние на момент манифеста
-
-| | |
-|---|---|
-| ревизия пройдена | нет — репа только заведена |
-| открытых задач | нет |
-| секреты | не проверено — репа пуста |
-"""
-
-    roadmap = f"""# ROADMAP — {name}
-
-> Только будущее и только открытое. Приоритеты, не вехи.
-> Основание: `_base/00-infrastructure/45-roadmap-and-tasks.md`.
-
-**СЛЕДУЮЩАЯ ЗАДАЧА:** ждёт первого реального наполнения.
-
-## P1
-
-- [ ] _(появится по мере работы)_
-"""
-
-    tasks = f"""# TASKS — {name}
-
-> Действия, которые может совершить только владелец: найти, скачать, прислать, решить.
-> Работа внутри песочницы — в `ROADMAP.md`.
-> Статус несёт чекбокс, не время глагола.
-
-_пока пусто — репа только заведена._
-"""
-
-    changelog = f"""# CHANGELOG — {name}
-
-## [0.1.0] — {today} — MINOR: скелет репозитория
-
-Заведена через `scripts/new_repo.py` (golden path, `76-repo-classes.md`).
-
-Формат: [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/) · SemVer.
-
-### Добавлено
-
-- Служебные файлы: `.repo-id`, `.repo-class`, `.repo-meta`, `VERSION`, `.gitignore`
-- Каркас: `README.md`, `START-HERE.md`, `ROADMAP.md`, `TASKS.md`, `WATCHLOG.md`, `MANIFEST.md`
-"""
-
-    vahta_note = "Вахта передаётся между аккаунтами V / J / M / S / A."
-    watchlog = f"""# WATCHLOG — {name}
-
-> {vahta_note} Принял вахту — сначала сюда,
-> потом эмпирическая сверка файлов, потом работа.
-
-## §0. Где стоим
-
-**Версия:** 0.1.0 · **Дата:** {today} · **Вахта:** —
-
-**Состояние:** скелет заведён через golden path (`new_repo.py`), наполнение
-не начато.
-
-**СЛЕДУЮЩАЯ ЗАДАЧА:** первое реальное наполнение — начать с `MANIFEST.md` §1
-(TODO там же).
-
-## §1. История вахт
-
-| Версия | Дата | Вахта | Что сделано |
-|---|---|---|---|
-| 0.1.0 | {today} | — | Скелет по стандарту через `new_repo.py`. |
-"""
-
-    files = {
-        ".repo-class": class_line + "\n",
-        ".repo-id": f"vevdokimovm/{name}\n",
-        ".repo-meta": f"description={desc}\ntopics={topics}\nprivate=true\n",
-        ".gitignore": GITIGNORE,
-        "VERSION": "0.1.0\n",
-        "README.md": readme,
-        "START-HERE.md": start_here,
-        "MANIFEST.md": manifest,
-        "ROADMAP.md": roadmap,
-        "TASKS.md": tasks,
-        "CHANGELOG.md": changelog,
-        "WATCHLOG.md": watchlog,
-    }
-    return files
+NAME_RE = re.compile(r"^[a-z][a-z0-9-]{1,38}[a-z0-9]$")
 
 
-def render_infra(name: str, desc: str, topics: str, today: str) -> dict[str, str]:
-    return {
-        ".repo-class": "infra\n",
-        ".repo-id": f"vevdokimovm/{name}\n",
-        ".repo-meta": f"description={desc}\ntopics={topics}\nprivate=true\n",
-        ".gitignore": GITIGNORE,
-        "VERSION": "0.1.0\n",
-        "README.md": f"# {name} — Vasilii Evdokimov\n\n{desc}\n\n> Most documents are in Russian.\n",
-    }
+def die(msg: str) -> int:
+    print(f"🔴 {msg}", file=sys.stderr)
+    return 2
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("name")
-    ap.add_argument("--class", dest="klass", required=True,
-                     choices=["infra", "core", "satellite", "temp", "product"])
-    ap.add_argument("--description", required=True)
-    ap.add_argument("--topics", default="")
-    ap.add_argument("--parent", help="обязателен для --class temp")
-    a = ap.parse_args()
+    ap = argparse.ArgumentParser(description="Завести репу по канону")
+    ap.add_argument("name", help="имя: латиница, строчные, дефисы")
+    ap.add_argument("--class", dest="cls", required=True, choices=sorted(CLASSES),
+                    help="класс репы (76-repo-classes.md §1)")
+    ap.add_argument("--desc", required=True, help="описание одной строкой")
+    ap.add_argument("--private", default="true", choices=["true", "false"],
+                    help="приватная ли (по умолчанию true)")
+    ap.add_argument("--apply", action="store_true",
+                    help="создать (по умолчанию — только показать план)")
+    args = ap.parse_args()
 
-    if a.klass == "temp" and not a.parent:
-        print("--class temp требует --parent <родительская-репа> (76-repo-classes.md §2)")
-        return 2
-
-    target = REPOS_DIR / a.name
+    # ── ПРЕДУСЛОВИЯ, все до единой записи (`/auto` §2г, правило 1)
+    if not NAME_RE.match(args.name):
+        return die(f"имя «{args.name}» нарушает правило: латиница, строчные, "
+                   f"дефисы, 3-40 символов (76-repo-classes.md §6)")
+    target = REPOS / args.name
     if target.exists():
-        print(f"уже существует: {target} — new_repo.py не для повторного применения")
-        return 2
+        return die(f"репа уже существует: {target}")
+    gitignore = BASE_REPO / "templates" / "gitignore.template"
+    if not gitignore.is_file():
+        return die(f"нет шаблона: {gitignore}")
 
-    today = datetime.date.today().isoformat()
+    files = CLASSES[args.cls]
+    # 🔴 Найдено тестом `test_repo_lifecycle.sh` 02.09.2026: шаблон README
+    # ссылался на `TASKS.md` безусловно, а класс `satellite` этот файл
+    # не получает — свежая репа рождалась с битой ссылкой и валила
+    # собственный гейт ревизии. Конструктор обязан ссылаться только на то,
+    # что сам же и создаёт.
+    tasks_link = (" · на владельце — [`TASKS.md`](TASKS.md)"
+                  if "TASKS.md" in files else "")
+    print(f"Завести репу «{args.name}» · класс {args.cls} · "
+          f"{'приватная' if args.private == 'true' else 'ПУБЛИЧНАЯ'}\n")
+    print(f"  путь:      {target}")
+    print(f"  .repo-id:  {OWNER}/{args.name}")
+    print(f"  файлов:    {', '.join(files)}")
 
-    if a.klass == "infra":
-        files = render_infra(a.name, a.description, a.topics, today)
-    else:
-        files = render_full(a.name, a.klass, a.description, a.topics, today, a.parent)
+    if not args.apply:
+        print("\n🟡 Это план. Создать: тот же вызов с --apply")
+        return 0
 
+    # ── СОЗДАНИЕ
     target.mkdir(parents=True)
-    for fname, content in files.items():
-        (target / fname).write_text(content, encoding="utf-8")
+    (target / ".repo-id").write_text(f"{OWNER}/{args.name}\n", encoding="utf-8")
+    (target / ".repo-class").write_text(f"{args.cls}\n", encoding="utf-8")
+    (target / "VERSION").write_text("0.1.0\n", encoding="utf-8")
+    (target / ".repo-meta").write_text(
+        f"description={args.desc}\ntopics=\nprivate={args.private}\n",
+        encoding="utf-8")
+    shutil.copy(gitignore, target / ".gitignore")
 
-    print(f"скелет собран: {target} ({len(files)} файлов, класс {a.klass})")
-    print("дальше вручную:")
-    print(f"  1. заполнить TODO в MANIFEST.md/START-HERE.md (если полный класс)")
-    print(f"  2. добавить запись в base-repo/repos-map.md (76-repo-classes.md §4.1 — "
-          f"обязательна, revision_check.py проверит при следующем релизе base-repo)")
-    print(f"  3. первый деплой — деплой.sh заведёт репо на GitHub")
+    today = date.today().isoformat()
+    stub = {
+        "README.md": f"""# {args.name} — {args.desc}
+
+<!-- STATUS -->
+> **Сейчас:** `v0.1.0` · {today} · Репа заведена, содержания пока нет
+> Открытое — [`ROADMAP.md`](ROADMAP.md){tasks_link}
+<!-- /STATUS -->
+
+## За что отвечает эта репа
+
+{args.desc}
+
+🔴 **Граница с соседями** — заполнить парой через «↔», иначе репа заведена
+не до конца (`76-repo-classes.md` §4.2).
+""",
+        "START-HERE.md": f"""# START-HERE — точка входа
+
+## За что отвечает эта репа
+
+{args.desc}
+
+🔴 **За что НЕ отвечает:** заполнить. Без этого граница не проведена.
+
+## Текущая точка
+
+**v0.1.0, {today}.** Репа заведена, содержания нет. Это честное состояние.
+""",
+        "ROADMAP.md": f"""# ROADMAP
+
+## §P. Приоритеты
+
+**СЛЕДУЮЩАЯ ЗАДАЧА:** наполнить репу содержанием — сейчас только каркас.
+
+### P1. Определить границу с соседними репами
+
+Пока не сформулирована парой через «↔», репа заведена не до конца.
+""",
+        "TASKS.md": """# TASKS
+
+## 🎯 Готово к запуску
+
+- [ ] Сформулировать границу с соседними репами
+
+## 🚧 В работе
+
+*(пусто)*
+""",
+        "CHANGELOG.md": f"""# CHANGELOG
+
+## [0.1.0] — {today}
+
+### Репа заведена
+
+Создана `scripts/new_repo.py` — каркас по канону класса `{args.cls}`.
+
+`.repo-id` = `{OWNER}/{args.name}` проставлен скриптом, а не руками:
+именно на этом шаге происходила ошибка при ручном заведении.
+""",
+    }
+    for f in files:
+        if f in stub:
+            (target / f).write_text(stub[f], encoding="utf-8")
+
+    # ── ПОСТУСЛОВИЯ: проверяется результат, а не «шаги не упали»
+    problems = []
+    rid = (target / ".repo-id").read_text().strip()
+    if rid != f"{OWNER}/{args.name}":
+        problems.append(f".repo-id = «{rid}», ожидалось «{OWNER}/{args.name}»")
+    for f in files:
+        if not (target / f).is_file():
+            problems.append(f"нет обязательного файла: {f}")
+    if (target / "VERSION").read_text().strip() != "0.1.0":
+        problems.append("VERSION не 0.1.0")
+
+    # 🔴 02.09.2026, PIT-G, пятый повтор. Найдено владельцем: «ты не положил
+    # в репу миграции базу почему то. гейта на этого нет что ли?».
+    #
+    # Гейт БЫЛ — `sync_base_local.py --check --all` честно показывал
+    # `migration · (нет штампа) ОТСТАЛА`. Не было исполнителя в нужный момент:
+    # заведение репы и раздача канона стояли разными шагами, и второй шаг
+    # оставался советом в конце вывода. Репа прожила шесть часов без `_base/` —
+    # единственная из 63.
+    #
+    # Совет в конце вывода — это и есть «правило без исполнителя»
+    # (`21-revision-protocol.md` §4г). Поэтому раздача теперь ДЕЛАЕТСЯ здесь,
+    # а её результат проверяется постусловием ниже: шаг, который нельзя забыть,
+    # потому что его никто не выполняет руками.
+    #
+    is_public = str(args.private).lower() == "false"
+    NO_BASE_CLASSES = {"archived"}   # тот же список, что в repo_invariants.py
+
+    # 🔴 РЕШАЕТ ПУБЛИЧНОСТЬ, А НЕ КЛАСС — исправлено 04.09.2026.
+    #
+    # Прежняя строка гласила «классы `product` и `profile` — публичные витрины,
+    # им `_base/` не кладётся никогда». Формулировка подменяла признак: `ADR-004`
+    # запрещает раздачу **публичным** репам, потому что канон системы не должен
+    # уезжать наружу вместе с продуктом. Класс тут ни при чём.
+    #
+    # Замер по 9 репам класса `product` — закономерность без единого исключения:
+    #
+    #     private=true   control-panel, personal-finance-dss, research-engine  → _base ЕСТЬ
+    #     private=false  algorithms-site, claude-usage, salvation, vk-graph, … → _base нет
+    #
+    # Расхождение стоило отката: заведение приватного продукта падало по `R-06`
+    # («нет _base/BASE_VERSION»), потому что `new_repo` не раздавал канон,
+    # а инвариант его требовал. Два места знали разное — классический `/auto` §7.
+    if not is_public and args.cls not in NO_BASE_CLASSES:
+        print("  · раскладываю _base/ (канон base-repo) …")
+        sync = subprocess.run(
+            ["python3", str(BASE_REPO / "scripts" / "sync_base_local.py"),
+             target.name],
+            capture_output=True, text=True, timeout=600)
+        if sync.returncode != 0:
+            problems.append(
+                f"_base/ не разложена: {(sync.stderr or sync.stdout).strip()[:200]}")
+        stamp = target / "_base" / "BASE_VERSION"
+        if not stamp.is_file():
+            problems.append("_base/BASE_VERSION нет — канон не раздан")
+
+    gate = subprocess.run(
+        ["python3", str(BASE_REPO / "scripts" / "revision_check.py"),
+         "--root", str(target)],
+        capture_output=True, text=True, timeout=300)
+    if "ИТОГ: DRIFT" in gate.stdout:
+        # 🔴 Называть, ЧТО именно не так. «Гейт не CLEAN» без причины
+        # отправляет читателя запускать гейт заново руками — а конструктор
+        # уже держит ответ в руках и просто выбрасывает его.
+        fails = [ln.strip() for ln in gate.stdout.splitlines()
+                 if ln.lstrip().startswith("[FAIL]") or ln.lstrip().startswith("·")]
+        detail = "; ".join(fails[:4]) or "причина не разобрана"
+        problems.append(f"гейт ревизии не CLEAN на свежей репе — {detail}")
+
+    # ── ИНВАРИАНТ КЛАССА, единый с гейтом и деструктором
+    # 🔴 Ровно то, чего не хватало: постусловия конструктора и правила гейта
+    # были разными списками, и репа могла пройти первый, провалив второй.
+    # Теперь список один — `repo_invariants.py`.
+    from repo_invariants import check as invariant_check
+    # phase="born": свежая репа ещё не выпускалась — требовать от неё
+    # записи в журнале выпусков значит не дать ей родиться.
+    for viol in invariant_check(target, phase="born"):
+        problems.append(f"{viol.code} {viol.text}")
+
+    if problems:
+        # 🔴 СИЛЬНАЯ ГАРАНТИЯ (strong exception guarantee), заказ владельца
+        # 02.09.2026: «как тогда работать если уже при создании объекта лажа».
+        #
+        # В C++ объект, чей конструктор бросил, НЕ СУЩЕСТВУЕТ — деструктор
+        # ему не зовётся, ссылок на него нет. Здесь было иначе: каталог
+        # оставался на диске в недособранном виде, а код возврата 1 читал
+        # только тот, кто на него смотрел. Так `migration` прожила шесть часов
+        # без `_base/`: конструктор отработал «наполовину успешно», и это
+        # состояние выглядело рабочим.
+        #
+        # Половина объекта хуже его отсутствия: отсутствие видно сразу,
+        # а половина мимикрирует под целое. Поэтому — откат.
+        print(f"\n  🔴 ИНВАРИАНТ НАРУШЕН: {len(problems)}")
+        for p in problems:
+            print(f"     · {p}")
+        try:
+            shutil.rmtree(target)
+            print(f"\n  🔴 ОТКАЧЕНО: {target} удалён целиком.")
+            print("     Репа не создана — недособранной репы не бывает.")
+            print("     Причина выше; исправь её и повтори тот же вызов.")
+        except OSError as e:
+            print(f"\n  🔴 ОТКАТ НЕ УДАЛСЯ: {e}")
+            print(f"     🔴 На диске остался НЕПОЛНЫЙ каталог: {target}")
+            print(f"     Убери руками: rm -rf {target}")
+        return 1
+
+    print(f"\n  🟢 создано: {target}")
+    print("  🟢 постусловия выполнены: .repo-id верен, файлы на месте, "
+          "_base/ разложена, гейт CLEAN")
+    print(f"\n  Дальше вручную (это решения, не ритуал):")
+    print(f"     · описать границу с соседями в README и START-HERE;")
+    print(f"     · добавить секцию в base-repo/repos-map.md и поднять счётчик;")
+    print(f"     · собрать архив: python3 scripts/pack_release.py {target}")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

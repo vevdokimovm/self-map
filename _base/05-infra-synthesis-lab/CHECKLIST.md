@@ -7,7 +7,7 @@
 
 ## A. До старта — допуск
 
-- [ ] `ANTHROPIC_API_KEY` установлен (ADR-010: только коммерческие условия)
+- [ ] `ANTHROPIC_API_KEY` установлен (mission-control:ADR-010: только коммерческие условия)
 - [ ] Рабочий каталог содержит **только открытую зону** — 🔴 `health-vault`
       и `legal-knowledge-base` физически отсутствуют
 - [ ] 🟡-репы (`self-map`, `christ-walk`, `family`, `truth-seeking`) в область не входят

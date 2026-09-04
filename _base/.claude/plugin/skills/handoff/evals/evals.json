@@ -1,0 +1,20 @@
+{
+  "skill": "handoff",
+  "runs_per_case": 3,
+  "note": "Негативы обязательны: скилл, срабатывающий всегда, так же плох, как не срабатывающий никогда. Типовой разрыв — в описании: оно объясняет WHAT вместо WHEN (37-skills-system.md §4а).",
+  "cases": [
+    { "prompt": "новый чат", "should_trigger": true },
+    { "prompt": "хочу очистить контекст", "should_trigger": true },
+    { "prompt": "clear", "should_trigger": true },
+    { "prompt": "готовь передачу вахты", "should_trigger": true },
+    { "prompt": "сохрани состояние, я закрываю сессию", "should_trigger": true },
+    { "prompt": "контекст заполнился, что делать", "should_trigger": true },
+    { "prompt": "обнови WATCHLOG §0", "should_trigger": false },
+    { "prompt": "собери архив версии", "should_trigger": false },
+    { "prompt": "заканчиваю сессию, замерь расход и передай вахту", "should_trigger": true },
+    { "prompt": "посчитай расход токенов этой сессии", "should_trigger": false },
+    { "prompt": "почисти мусор macOS в дереве", "should_trigger": false },
+    { "prompt": "что открыто в роадмапе", "should_trigger": false },
+    { "prompt": "очисти список задач в TASKS.md", "should_trigger": false }
+  ]
+}

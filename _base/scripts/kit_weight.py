@@ -58,6 +58,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _roots import resolve_roots  # noqa: E402
 BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import refs_index  # noqa: E402
+
 SKIP = {".git", "__pycache__", ".venv", "node_modules", "_base"}
 # Шаблон не упоминается по природе: его копируют, а не цитируют.
 BY_DESIGN = (".template", ".example")
@@ -79,18 +82,19 @@ def distributed_files() -> list[Path]:
 
 
 def unreferenced(files: list[Path]) -> list[Path]:
-    """Файлы, чьё имя не встречается больше нигде в базе."""
-    corpus = []
-    for p in BASE_REPO.rglob("*"):
-        if p.is_file() and p.suffix in {".md", ".py", ".sh", ".json"} \
-                and not any(s in p.parts for s in SKIP):
-            try:
-                corpus.append((p.relative_to(BASE_REPO),
-                               p.read_text(encoding="utf-8", errors="replace")))
-            except OSError:
-                continue
-    return [rel for rel in files
-            if not any(src != rel and rel.name in text for src, text in corpus)]
+    """Файлы, чьё имя не встречается больше нигде в базе.
+
+    🔴 СЧИТАЕТ НЕ САМ — 03.09.2026 переведён на `refs_index`. Здесь стояла
+    своя копия обхода и своего понятия «ссылка»; такая же копия жила
+    в `check_incoming_refs.py`, третья — в гейте. Кандидат №14 очереди уже
+    показал, чем это кончается: **пять** независимых определений карточки
+    реестра, два расходились с тремя, и на живых данных это было невидимо.
+
+    Определение сведено ДО расхождения, а не после. Поведение сохранено:
+    вопрос этого скрипта прежний — «что не нужно **раздавать**».
+    """
+    corpus = refs_index.build(BASE_REPO)
+    return refs_index.unreferenced(files, corpus)
 
 
 def selftest() -> bool:

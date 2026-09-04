@@ -54,7 +54,16 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _roots import resolve_roots  # noqa: E402
 BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
-DOWNLOADS = Path.home() / "Downloads"
+# 🔴 Путь к артефактам берётся из того же `_roots`, что уже импортирован выше.
+# Первая редакция правки 03.09.2026 добавила сюда СВОЙ `sys.path.insert` —
+# и скрипт упал на `NameError: sys`, потому что в этом файле `sys` ввозится
+# как `_sys` (строка выше). Правка была верной по смыслу и слепой к месту:
+# копипаст трёх строк из соседнего скрипта, где импорт называется иначе.
+#
+# Урок: правка, повторённая в пяти файлах, обязана быть ЗАПУЩЕНА в пяти —
+# компиляция это пропускает, `NameError` живёт до первого вызова (`§2г` п.3).
+from _roots import artifacts_dir  # noqa: E402
+DOWNLOADS = artifacts_dir()
 
 HARD_FILE = 100 * 2**20      # push отклоняется
 WARN_FILE = 50 * 2**20       # предупреждение GitHub

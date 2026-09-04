@@ -48,44 +48,52 @@ def index(root):
     return by_hash, by_name
 
 
-canon_hash, canon_name = index(CANON)
-print(f"канон: {len(canon_hash)} уникальных blob'ов, {len(canon_name)} имён\n")
+def _main_body() -> None:
+    canon_hash, canon_name = index(CANON)
+    print(f"канон: {len(canon_hash)} уникальных blob'ов, {len(canon_name)} имён\n")
 
-total = defaultdict(int)
-unknown = defaultdict(list)
+    total = defaultdict(int)
+    unknown = defaultdict(list)
 
-for repo in LEGACY:
-    inf = ROOT / repo / "00-infrastructure"
-    if not (inf / MARKER).exists():
-        print(f"{repo:<24} — плоской копии нет, пропуск")
-        continue
-    dup = old = new = 0
-    for dp, dn, fns in os.walk(inf):
-        dn[:] = [d for d in dn if d not in SKIP]
-        for fn in fns:
-            if fn == ".DS_Store":
-                continue
-            p = Path(dp) / fn
-            h = sha1(p)
-            if h in canon_hash:
-                dup += 1
-            elif fn in canon_name:
-                old += 1
-            else:
-                new += 1
-                unknown[fn].append(str(p.relative_to(ROOT)))
-    total["dup"] += dup
-    total["old"] += old
-    total["new"] += new
-    print(f"{repo:<24} дубль {dup:>4} · старая версия {old:>4} · ⚠ имени нет в базе {new:>4}")
+    for repo in LEGACY:
+        inf = ROOT / repo / "00-infrastructure"
+        if not (inf / MARKER).exists():
+            print(f"{repo:<24} — плоской копии нет, пропуск")
+            continue
+        dup = old = new = 0
+        for dp, dn, fns in os.walk(inf):
+            dn[:] = [d for d in dn if d not in SKIP]
+            for fn in fns:
+                if fn == ".DS_Store":
+                    continue
+                p = Path(dp) / fn
+                h = sha1(p)
+                if h in canon_hash:
+                    dup += 1
+                elif fn in canon_name:
+                    old += 1
+                else:
+                    new += 1
+                    unknown[fn].append(str(p.relative_to(ROOT)))
+        total["dup"] += dup
+        total["old"] += old
+        total["new"] += new
+        print(f"{repo:<24} дубль {dup:>4} · старая версия {old:>4} · ⚠ имени нет в базе {new:>4}")
 
-print(f"\nИТОГО: дублей {total['dup']} · старых версий {total['old']} · "
-      f"⚠ неизвестных {total['new']}")
+    print(f"\nИТОГО: дублей {total['dup']} · старых версий {total['old']} · "
+          f"⚠ неизвестных {total['new']}")
 
-print("\n=== ⚠ ИМЕНА, КОТОРЫХ НЕТ В АКТУАЛЬНОЙ БАЗЕ ===")
-for fn, paths in sorted(unknown.items(), key=lambda kv: -len(kv[1])):
-    print(f"\n{fn}  ({len(paths)} копий)")
-    for p in sorted(paths)[:4]:
-        print(f"    {p}")
-    if len(paths) > 4:
-        print(f"    … ещё {len(paths)-4}")
+    print("\n=== ⚠ ИМЕНА, КОТОРЫХ НЕТ В АКТУАЛЬНОЙ БАЗЕ ===")
+    for fn, paths in sorted(unknown.items(), key=lambda kv: -len(kv[1])):
+        print(f"\n{fn}  ({len(paths)} копий)")
+        for p in sorted(paths)[:4]:
+            print(f"    {p}")
+        if len(paths) > 4:
+            print(f"    … ещё {len(paths)-4}")
+
+# 🔴 ГВАРД ДОБАВЛЕН 04.09.2026. Тело лежало на верхнем уровне: импорт ради
+# одной функции запускал всю программу. У `scan_lessons.py` это перезаписало
+# артефакт при попытке прочитать код — чтение изменило состояние.
+# Правило и проверка — `00-infrastructure/102-debugging-discipline.md` §3а.
+if __name__ == "__main__":
+    _main_body()
