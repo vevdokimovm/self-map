@@ -197,8 +197,9 @@ def scan_writers(base: Path, within: tuple[str, ...]) -> list[tuple[Path, str]]:
         два (`scan_lessons.py`, `tg_export_to_md.py`), и они пишут туда,
         куда скажут, то есть вне набора по умолчанию;
       · путь, собранный из переменной в другом файле;
-      · запись из shell — она проверена вручную 03.09.2026 и вся идёт
-        в `/tmp` и `$HOME`, но автоматически здесь не ловится.
+      · путь из shell, собранный через переменную из ДРУГОГО файла или
+        через подстановку команды сложнее `$(cd … && pwd)`. Литеральный
+        хвост после `pwd)` разбирается — см. `_scan_shell`.
     Поэтому перепись — **помощник ревью, а не доказательство полноты**.
     """
     # 🔴 КОРЕНЬ СВОДИТСЯ, ИНАЧЕ ВСЕ НАХОДКИ МОЛЧА ПРОПАДАЮТ. Цель считается
@@ -217,6 +218,8 @@ def scan_writers(base: Path, within: tuple[str, ...]) -> list[tuple[Path, str]]:
             if "__pycache__" in script.parts:
                 continue
             found.extend(_scan_one(script, base, within))
+        for script in sorted(root.rglob("*.sh")):
+            found.extend(_scan_shell(script, base, within))
     for script in sorted((base / "scripts").glob("*.py")):
         found.extend(_scan_one(script, base, within))
     # дедуп с сохранением порядка
@@ -225,6 +228,93 @@ def scan_writers(base: Path, within: tuple[str, ...]) -> list[tuple[Path, str]]:
         if str(rel) not in seen:
             seen.add(str(rel))
             out.append((rel, who))
+    return out
+
+
+# ── Shell-писатели ────────────────────────────────────────────────────
+# 🔴 ЗАВЕДЕНО 05.09.2026, И ПОВОД — УСТАРЕВШЕЕ ЧЕСТНОЕ УТВЕРЖДЕНИЕ.
+# Докстрока `scan_writers` объявляла предел прямо: «запись из shell
+# проверена вручную 03.09.2026 и вся идёт в /tmp и $HOME». Утверждение
+# было верным в день, когда его писали. 05.09.2026 в `12-workstation-kit`
+# появились два сборщика на shell, пишущие в `observations/` — то есть
+# ВНУТРЬ раздаваемого канона.
+#
+# Что из этого вышло: отпечаток набора менялся каждые десять секунд,
+# и `sync_base_local.py --all --check` объявил **58 реп разошедшимися**
+# сразу после успешной раздачи. Гейт при этом оставался зелёным —
+# «Записи в раздаваемое объявлены» — потому что перепись читала только
+# `*.py` и двух новых писателей не видела вовсе.
+#
+# 🔴 Класс: `21` §4а-трис наизнанку. Там старело ВНЕШНЕЕ состояние без
+# события в системе; здесь состарилось СОБСТВЕННОЕ утверждение о системе,
+# и состарила его наша же работа. Ручная перепись, записанная как факт,
+# ничем не связана с тем, что перепись описывает, — и расходится молча.
+#
+# ПОТОЛОК, названный явно (`71` §7г-бис). Разбирается ровно та форма,
+# которой пользуются наши сборщики:
+#     OUT="$(cd "$(dirname "$0")/.." && pwd)/observations/samples.tsv"
+#     ... >> "$OUT"
+# и прямая запись в литеральный путь. НЕ разбирается: путь из аргумента,
+# путь из переменной окружения, склейка через несколько переменных,
+# `eval`. Полного разбора shell не бывает, и обещать его нельзя.
+#
+# 🔴 ЛИТЕРАЛЬНАЯ ВЕТКА СНЯТА В ТОТ ЖЕ ЧАС. Первая редакция ловила ещё и
+# прямую запись `>> "путь"`. На наборе она дала два ложных: `>` внутри
+# heredoc с ПИТОНОВСКИМ кодом (`templates/deploy.sh`) и обрывок `tests/)`
+# из подстановки (`tests/test_readme_status.sh`). Ложное красное дороже
+# пропуска (`PIT-190`): оно требует объявить путь, которого нет, — объявишь
+# по её словам, она замолчит, а настоящий файл останется необъявленным.
+# Ветка через переменную покрывает реальную форму и ложных не даёт.
+_SH_ASSIGN = re.compile(r'^\s*([A-Za-z_][A-Za-z0-9_]*)=(.+?)\s*$', re.M)
+_SH_WRITE = re.compile(
+    r'(?:>>|>|\btee\b(?:\s+-a)?)\s*"?\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?"?')
+
+
+def _sh_target(expr: str, script: Path) -> Path | None:
+    """Куда указывает значение переменной. None — форма не распознана."""
+    if 'dirname "$0"' not in expr and "dirname $0" not in expr:
+        return None
+    head, sep, tail = expr.partition("pwd)")
+    if not sep:
+        head, sep, tail = expr.partition('dirname "$0")')
+        if not sep:
+            return None
+    anchor = script.resolve().parent
+    for _ in range(head.count("/..")):
+        anchor = anchor.parent
+    tail = tail.strip().strip('"').lstrip("/")
+    if not tail or "$" in tail:
+        return None
+    return anchor.joinpath(*tail.split("/"))
+
+
+def _scan_shell(script: Path, base: Path,
+                within: tuple[str, ...]) -> list[tuple[Path, str]]:
+    try:
+        text = script.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    paths: dict[str, Path] = {}
+    for m in _SH_ASSIGN.finditer(text):
+        name, expr = m.group(1), m.group(2)
+        target = _sh_target(expr, script)
+        if target is not None:
+            paths[name] = target
+
+    targets: list[Path] = []
+    for m in _SH_WRITE.finditer(text):
+        t = paths.get(m.group(1))
+        if t is not None:
+            targets.append(t)
+
+    out = []
+    for target in targets:
+        try:
+            rel = target.relative_to(base)
+        except ValueError:
+            continue
+        if rel.parts and rel.parts[0] in within:
+            out.append((rel, script.relative_to(base).as_posix()))
     return out
 
 

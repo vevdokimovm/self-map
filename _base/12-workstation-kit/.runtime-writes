@@ -5,3 +5,12 @@
 
 observations/measurements.csv   # machine_probe.py — строка на каждый запуск
 snapshots/*.json                # inventory.py — снимок приложений на дату
+observations/net-samples*.tsv   # net_sampler.sh — ряд трафика по секундам
+observations/tunnel-samples*.tsv  # tunnel_sampler.sh — счётчики туннеля во время матча
+observations/long-run/*         # interplay_probe.sh SHOTS=0 — длинный ряд показаний
+observations/conn-samples*.tsv  # conn_sampler.sh — соединения туннеля
+#   🔴 ЗВЁЗДОЧКА ОБЯЗАТЕЛЬНА: сохранённый срез ряда получает имя
+#   с суффиксом («-без-пути»), и точное имя его не покрывает —
+#   58 реп разошлись повторно через час после первого раза.
+observations/freeze-watch*.tsv   # freeze_watch.sh — секундный ряд для коротких зависаний
+observations/dns-samples*.tsv  # dns_probe.sh — задержка резолвера

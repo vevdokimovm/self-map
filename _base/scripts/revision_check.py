@@ -3018,6 +3018,52 @@ def selftest_exception_budget() -> bool:
         return len(fails) == 1 and not warns
 
 
+def check_tools_linked(root: Path) -> list[str]:
+    """Каждый инструмент в `<кит>/bin/` упомянут в README своего кита.
+
+    🔴 ЗАЧЕМ МЕХАНИЧЕСКАЯ ПРОВЕРКА. `PIT-G` — «артефакт заведён, оснастка
+    не поправлена» — сработал **двадцать раз**. Правило `incidents/
+    PITFALLS.md` говорит: счётчик дошёл до трёх — нужна проверка, а не
+    заплатка. Двадцать повторов при живом правиле означают, что помнить
+    про связку невозможно, и каждая вахта изобретает `grep` заново.
+    05.09.2026 такой самодельный `grep` нашёл сразу четыре инструмента,
+    пролежавших несвязанными неизвестно сколько.
+
+    🔴 ЧЕГО НЕ ЛОВИТ: упоминание есть, но ведёт не туда или описывает
+    другое. Проверяется наличие имени файла в README, а не осмысленность
+    строки — это суждение, гейт умеет только verification.
+    """
+    проблемы = []
+    for bindir in sorted(root.glob("*/bin")):
+        кит = bindir.parent
+        readme = кит / "README.md"
+        if not readme.is_file():
+            continue
+        текст = readme.read_text(encoding="utf-8", errors="replace")
+        for файл in sorted(bindir.iterdir()):
+            if файл.suffix not in (".py", ".sh") or файл.name.startswith("_"):
+                continue
+            if файл.name not in текст:
+                проблемы.append(
+                    f"{кит.name}/bin/{файл.name} — не упомянут "
+                    f"в {кит.name}/README.md")
+    return проблемы
+
+
+def selftest_tools_linked() -> bool:
+    """Канарейка: проверка обязана отличать связанный инструмент от нет."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        корень = Path(td)
+        кит = корень / "99-kit"
+        (кит / "bin").mkdir(parents=True)
+        (кит / "bin" / "seen.py").write_text("x", encoding="utf-8")
+        (кит / "bin" / "unseen.py").write_text("x", encoding="utf-8")
+        (кит / "README.md").write_text("см. `bin/seen.py`", encoding="utf-8")
+        вышло = check_tools_linked(корень)
+        return len(вышло) == 1 and "unseen.py" in вышло[0]
+
+
 def check_allowlist_rot(root: Path) -> list[str]:
     """Исключение, пережившее свой предмет, — тихо выключенная проверка.
 
@@ -3686,6 +3732,21 @@ def main() -> int:
             print(f"[FAIL] Карточка без ответа о разрешении: {len(unresolved)}")
             for line in unresolved[:5]:
                 print(f"    · {line}")
+
+    if not selftest_tools_linked():
+        failures.append("канарейка связки инструментов сломана: не отличает "
+                        "упомянутый в README инструмент от неупомянутого")
+        print("[FAIL] Канарейка связки инструментов: самопроверка не прошла")
+    else:
+        несвязанные = check_tools_linked(root)
+        if несвязанные:
+            failures.extend(несвязанные)
+            print(f"[FAIL] Инструменты без связки из README (PIT-G): "
+                  f"{len(несвязанные)}")
+            for line in несвязанные[:5]:
+                print(f"    · {line}")
+        else:
+            print("[OK] Каждый инструмент в */bin связан из README своего кита")
 
     if not selftest_pointer_files():
         failures.append("канарейка файлов-указателей сломана: не отличает "
