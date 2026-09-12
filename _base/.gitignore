@@ -34,3 +34,10 @@ temp/
 # *.pdf
 # scans/
 __pycache__/
+
+# --- Симлинки сборки плагина (07.09.2026) ---
+# `.claude/plugin/agents` и `skills` — симлинки на ../agents и ../skills.
+# Их содержимое уже лежит в репе по настоящему пути; симлинк в истории
+# создал бы вторую копию тех же файлов и шум в каждом `git status`.
+.claude/plugin/agents
+.claude/plugin/skills

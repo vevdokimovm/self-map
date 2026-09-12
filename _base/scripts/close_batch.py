@@ -77,6 +77,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import re
 import sys
 from pathlib import Path
 
@@ -251,6 +252,17 @@ def verify_postconditions(repo: Path, new_version: str) -> list[str]:
     return problems
 
 
+# 🔴 Паспорт работы в теле CHANGELOG — оценка `NN/100` с обоснованием.
+# Повод: 05.09.2026 механизм паспортов синтезирован в базу наполовину,
+# и неполнота НЕ была объявлена — владелец был уверен, что всё на месте
+# (`reports/incidents/2026-09-05-passport-synthesis-failure.md`).
+# Стандарт — `00-infrastructure/104-work-quality-passport.md`.
+#
+# Это ПРЕДУПРЕЖДЕНИЕ, а не отказ: оценку ставит суждение, и заставить
+# написать её командой нельзя — можно только не дать забыть.
+PASSPORT_RE = re.compile(r"\b\d{1,3}\s*/\s*100\b")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("repo")
@@ -323,6 +335,8 @@ def main() -> int:
     elif a.body_file:
         body = Path(a.body_file).read_text(encoding="utf-8")
 
+    warn_no_passport = body and not PASSPORT_RE.search(body)
+
     bump_flag = "--major" if a.major else "--minor" if a.minor else "--patch"
     # У базы шагов шесть: добавляется раздача канона наследникам.
     total = 6 if (REPOS / a.repo) == BASE_REPO else 5
@@ -332,6 +346,8 @@ def main() -> int:
         return 0
 
     if a.dry_run:
+        if warn_no_passport:
+            print("🟡 в теле нет оценки NN/100 — паспорт работы отсутствует (`104`)")
         print(f"ПЛАН для {a.repo} ({bump_flag}):")
         print("  1. revision_check.py --root … → обязан CLEAN")
         print("  2. gate_monitor.py → живы ли сами проверки (не блокирует)")
@@ -456,8 +472,25 @@ def main() -> int:
         return 1
 
     print_state(repo)
+    if warn_no_passport:
+        print("\n🟡 В теле CHANGELOG нет оценки вида NN/100.")
+        print("   Работа сдана без паспорта — по `104` это обещание, а не результат.")
+        print("   Если работа мелкая, паспорт не нужен; если нет — допиши оценку.")
+
     print(f"\n✅ батч закрыт: {a.repo} v{new_version}")
     print("   Сторож авто-режима переставляется отдельно — им управляет /auto.")
+    # 🔴 СЛЕДУЮЩИЙ ШАГ ПЕЧАТАЕТСЯ ЗДЕСЬ, А НЕ ЖИВЁТ В ДОКУМЕНТЕ.
+    # `ADR-008` отдал выпуск вахте: коммит, тег, push и релиз делает
+    # `publish.py`. Правило, которое надо вспомнить, не работает — это
+    # проверено трижды (`/auto` §2в, `PIT-202`, `PIT-G`). Подсказка стоит
+    # там, где она нужна: сразу после закрытия батча.
+    # 🔴 ИМЯ РЕПЫ, А НЕ ПУТЬ: `publish.py` принимает имя и сам ищет
+    # каталог через `_roots`. Первая редакция печатала `{repo}`, где
+    # к этому месту лежал уже полный путь — команда из подсказки
+    # не работала бы. Подсказка, которую нельзя скопировать, бесполезна.
+    print(f"\n   Выпустить: python3 scripts/publish.py {Path(str(repo)).name}")
+    print("   (атрибуция → описание парсером деплойера → ассет → коммит →")
+    print("    тег → push → релиз. `deploy.sh` для этого больше не нужен.)")
     return 0
 
 

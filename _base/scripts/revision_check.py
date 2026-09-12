@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import subprocess
 from urllib.parse import unquote
 import sys
 from pathlib import Path
@@ -3018,6 +3019,70 @@ def selftest_exception_budget() -> bool:
         return len(fails) == 1 and not warns
 
 
+def check_attribution(root: Path) -> list[str]:
+    """В истории и настройках репы нет никого, кроме владельца.
+
+    🔴 ЗАЧЕМ В ГЕЙТЕ, А НЕ ТОЛЬКО В ХУКЕ. `git commit --no-verify` обходит
+    любой хук — это свойство git, а не дыра. Значит нужен слой, который
+    ловит просочившееся ПОСТФАКТУМ, и он обязан срабатывать сам, при каждом
+    закрытии батча. Требование владельца 04.09.2026: «ни в контрибьюторах
+    гита, ни в коммитах, ни в релизах, нигде».
+
+    🔴 ЧЕГО НЕ ЛОВИТ: тело релиза на GitHub (живёт не в git) и уже
+    запушенную грязь — её чистка требует force-push, а это необратимое
+    действие вовне, то есть решение владельца, а не вахты.
+    """
+    инструмент = root / "scripts" / "attribution_check.py"
+    if not инструмент.is_file():
+        return ["scripts/attribution_check.py отсутствует — атрибуция ничем не проверена"]
+    res = subprocess.run([sys.executable, str(инструмент), "--repo", str(root)],
+                         capture_output=True, text=True, encoding="utf-8")
+    if res.returncode == 0:
+        return []
+    return [l.strip(" ·") for l in res.stdout.splitlines()
+            if l.strip().startswith("·")] or ["атрибуция нарушена, подробности в attribution_check.py"]
+
+
+def check_shell_ascii(root: Path) -> list[str]:
+    """Имена переменных в shell-скриптах — только ASCII (`PIT-202`, 3 повтора)."""
+    инструмент = root / "scripts" / "shell_ascii_check.py"
+    if not инструмент.is_file():
+        return []
+    res = subprocess.run([sys.executable, str(инструмент), str(root)],
+                         capture_output=True, text=True, encoding="utf-8")
+    if res.returncode == 0:
+        return []
+    return [l.strip(" ·") for l in res.stdout.splitlines() if l.strip().startswith("·")]
+
+
+def check_git_health(root: Path) -> list[str]:
+    """Настройки git-реп, чьё отсутствие молчит до момента отказа.
+
+    🔴 ЗАЧЕМ В ГЕЙТЕ. За 09.09.2026 нашлось ПЯТЬ недостающих настроек,
+    и все пять вели себя одинаково: инструмент заведения отрабатывал
+    с кодом 0, ни одна команда не падала, симптом не наступал — пока
+    не понадобится. `unable to read sha1 file` выглядит как порча
+    репозитория, а не как отсутствующая строка конфига (`PIT-211`).
+
+    Первую нашёл независимый ресёрч, остальные четыре — только когда
+    вахта пошла перебирать список руками. Значит проверка обязана
+    срабатывать сама.
+
+    🔴 ЧЕГО НЕ ЛОВИТ: целостность объектов, живость remote, содержимое.
+    Только конфигурацию, и только ту, чьё отсутствие уже кусало —
+    список растёт по находкам, а не по догадкам.
+    """
+    инструмент = root / "scripts" / "git_health.py"
+    if not инструмент.is_file():
+        return []
+    res = subprocess.run([sys.executable, str(инструмент)],
+                         capture_output=True, text=True, encoding="utf-8")
+    if res.returncode == 0:
+        return []
+    return [l.strip() for l in res.stdout.splitlines()
+            if l.strip().startswith("🔴") and "недостач" not in l]
+
+
 def check_tools_linked(root: Path) -> list[str]:
     """Каждый инструмент в `<кит>/bin/` упомянут в README своего кита.
 
@@ -3062,6 +3127,55 @@ def selftest_tools_linked() -> bool:
         (кит / "README.md").write_text("см. `bin/seen.py`", encoding="utf-8")
         вышло = check_tools_linked(корень)
         return len(вышло) == 1 and "unseen.py" in вышло[0]
+
+
+def check_work_passport(root: Path, свежих: int = 5) -> list[str]:
+    """Свежие версии `CHANGELOG` несут оценку работы `NN/100` (`104`).
+
+    🔴 ЗАЧЕМ. 05.09.2026 механизм паспортов качества был синтезирован
+    в базу **наполовину** — пять полей из девяти, — и неполнота
+    **не была объявлена**. Владелец был уверен, что всё на месте.
+    Ущерб не в потере, а в уверенности: она снимает вопрос, который
+    иначе был бы задан (`reports/incidents/2026-09-05-passport-synthesis-failure.md`).
+
+    Правило `104`: работа без оценки её полноты — обещание, а не результат.
+    Проверка смотрит **последние N секций версий** и требует в каждой
+    число вида `NN/100`.
+
+    🔴 ЧЕГО НЕ ЛОВИТ — и это главное её ограничение:
+    честность оценки. `95/100` на халтуре пройдёт так же, как на работе.
+    Проверяется **наличие** самооценки, а не её правдивость — последнее
+    суждение, и гейт умеет только verification. Защита от завышения —
+    не здесь, а в обязательных «почему не 95» и «почему не ниже» (`104` §4).
+
+    Мелкие правки паспорта не требуют (`104` §1), поэтому отсутствие
+    оценки — **предупреждение уровня секции**, а не отказ репе.
+    """
+    changelog = root / "CHANGELOG.md"
+    if not changelog.is_file():
+        return []
+    текст = changelog.read_text(encoding="utf-8", errors="replace")
+    секции = re.split(r"^## \[", текст, flags=re.M)[1:]
+    проблемы = []
+    for секция in секции[:свежих]:
+        версия = секция.split("]", 1)[0]
+        if not re.search(r"\b\d{1,3}\s*/\s*100\b", секция):
+            проблемы.append(
+                f"v{версия} — нет оценки работы NN/100 (`104` §2)")
+    return проблемы
+
+
+def selftest_work_passport() -> bool:
+    """Канарейка: версия с оценкой и без обязаны различаться."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        корень = Path(td)
+        (корень / "CHANGELOG.md").write_text(
+            "# CH\n\n## [2.0.0] — с оценкой\n\nОЦЕНКА: 88/100.\n\n"
+            "## [1.0.0] — без оценки\n\nпросто текст\n",
+            encoding="utf-8")
+        вышло = check_work_passport(корень)
+        return len(вышло) == 1 and "1.0.0" in вышло[0]
 
 
 def check_allowlist_rot(root: Path) -> list[str]:
@@ -3733,11 +3847,56 @@ def main() -> int:
             for line in unresolved[:5]:
                 print(f"    · {line}")
 
+    # 🔴 ВЫЗОВ ПО ИМЕНИ, А НЕ ЧЕРЕЗ ЦИКЛ ПО КОРТЕЖУ. Первая редакция
+    # регистрировала обе проверки списком и звала их через переменную —
+    # мета-гейт (`gate_monitor.py`) объявил их «определены, но не
+    # вызываются», и был прав: косвенный вызов не отследить текстом.
+    # Проверка, которую не видно, для мета-гейта не существует.
+    грязь = check_attribution(root)
+    if грязь:
+        failures.extend(грязь)
+        print(f"[FAIL] Атрибуция: в истории или настройках упомянут ассистент: {len(грязь)}")
+        for line in грязь[:5]:
+            print(f"    · {line}")
+    else:
+        print("[OK] Атрибуция: в истории и настройках только владелец")
+
+    нездоровые = check_git_health(root)
+    if нездоровые:
+        failures.extend(нездоровые)
+        print(f"[FAIL] Репы с недостающими настройками git (PIT-211): "
+              f"{len(нездоровые)}")
+        for line in нездоровые[:5]:
+            print(f"    · {line}")
+    else:
+        print("[OK] Настройки git-реп на месте")
+
+    не_ascii = check_shell_ascii(root)
+    if не_ascii:
+        failures.extend(не_ascii)
+        print(f"[FAIL] Имена переменных в shell не ASCII (PIT-202): {len(не_ascii)}")
+        for line in не_ascii[:5]:
+            print(f"    · {line}")
+    else:
+        print("[OK] Имена переменных в shell — только ASCII")
+
     if not selftest_tools_linked():
         failures.append("канарейка связки инструментов сломана: не отличает "
                         "упомянутый в README инструмент от неупомянутого")
         print("[FAIL] Канарейка связки инструментов: самопроверка не прошла")
     else:
+        без_паспорта = (check_work_passport(root)
+                        if selftest_work_passport() else None)
+        if без_паспорта is None:
+            warnings.append("канарейка паспорта работы сломана")
+            print("[WARN] Канарейка паспорта работы: самопроверка не прошла")
+        elif без_паспорта:
+            warnings.extend(без_паспорта)
+            print(f"[WARN] Версии без оценки работы NN/100 (`104`): "
+                  f"{len(без_паспорта)}")
+            for м in без_паспорта:
+                print(f"    · {м}")
+
         несвязанные = check_tools_linked(root)
         if несвязанные:
             failures.extend(несвязанные)

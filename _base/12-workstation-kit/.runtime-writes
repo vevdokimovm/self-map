@@ -14,3 +14,6 @@ observations/conn-samples*.tsv  # conn_sampler.sh — соединения ту�
 #   58 реп разошлись повторно через час после первого раза.
 observations/freeze-watch*.tsv   # freeze_watch.sh — секундный ряд для коротких зависаний
 observations/dns-samples*.tsv  # dns_probe.sh — задержка резолвера
+observations/power-samples*.tsv  # замеры питания — 🔴 ведётся РУКАМИ, инструмента нет
+#   Журнал без скрипта объявляется так же, как журнал со скриптом: отпечатку
+#   всё равно, кто автор строки. Пропуск нашёл гейт 07.09.2026, а не вахта.
