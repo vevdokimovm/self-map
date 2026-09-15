@@ -131,6 +131,10 @@ DISTRIBUTE_FILES = (
     ".claude", ".githooks", "reports", "scripts", "templates", "tests",
     "00-CLAUDE-STOP.md", "00-MANIFEST.md", "00-MANIFEST-attack-on-titan.md",
     "CHANGELOG.md", "README.md", "ROADMAP.md", "TASKS.md", "START-HERE.md",
+    # 🔴 INFRA-UPDATES.md забыт при заведении патчноутов 14.09.2026: файл создан,
+    # хук старта его читает, а раздачи не было — 0 из 58 реп получили его за сутки.
+    # Механизм «все узнают при входе» не работал ни в одной репе, кроме канона.
+    "INFRA-UPDATES.md",
     "DO-NOT-EDIT.md", "repos-map.md", "repos-map-CHANGELOG.md",
     ".gitignore", ".repo-class",
 )
