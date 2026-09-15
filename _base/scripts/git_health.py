@@ -88,6 +88,9 @@ def проверить(корень: Path) -> list[tuple[str, str, str | None]]:
             None))
 
     путь = _путь_хуков(корень)
+    # Репа без своих хуков — это ПУБЛИЧНОЕ ЗЕРКАЛО, и так задумано:
+    # проверки проходятся, когда копия делается из приватной репы в зеркало,
+    # а не в самом зеркале (владелец, 13.09.2026). Поэтому здесь не требуется.
     if путь and _cfg(корень, "core.hooksPath") != путь:
         беды.append((
             f"core.hooksPath не указывает на {путь}",
@@ -99,6 +102,15 @@ def проверить(корень: Path) -> list[tuple[str, str, str | None]]:
             "maintenance.auto = false",
             "репа НИКОГДА не делает авто-gc; остаётся после unregister",
             "config --unset maintenance.auto"))
+
+    if _cfg(корень, "remote.origin.promisor") == "true":
+        for ключ in ("diff.renames", "status.renames"):
+            if _cfg(корень, ключ) != "false":
+                беды.append((
+                    f"{ключ} не выключен",
+                    "поиск переименований тянет старые блобы из сети: "
+                    "замер — 1151 запрос на один коммит",
+                    f"config {ключ} false"))
 
     return беды
 

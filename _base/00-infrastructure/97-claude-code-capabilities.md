@@ -21,7 +21,7 @@
 | **Субагенты** | 4 | `researcher` · `token-probe` · `repo-inventory` · `base-coverage-probe` |
 | **Хуки** | 4 файла, 3 события | `protect-base-mirror` · `ritual-gate` · `task-hygiene` · `watch-identity` |
 | **Плагины включены** | 4 из 16 | `security-guidance` · `hookify` · `semgrep` · `chrome-devtools-mcp` |
-| **Переменные среды** | 1 | `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION=400` |
+| **Переменные среды** | 1 | 🔴 `CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION` — **ДЕЙСТВУЮЩЕЕ ограничение, не справка.** Было `400`, с 11.09.2026 — `1000000` (решение владельца). Бюджет общий на сессию **вместе с подагентами**; при исчерпании `WebSearch` возвращает «used its web search budget (N of N)» и работа тихо деградирует. Живёт в `~/.claude/settings.json` → `env`, правится вахтой в одну строку. `PIT-213` |
 
 **События хуков заняты:** `SessionStart`, `PreToolUse`, `Stop`.
 **Свободны:** `PostToolUse`, `UserPromptSubmit`, `SubagentStop`, `PreCompact`,

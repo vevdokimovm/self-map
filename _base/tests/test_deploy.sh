@@ -1109,26 +1109,33 @@ case_ "G8" "Команда удаления совместима с BSD xargs (m
 assert_missing "нет xargs -d (нет в BSD)" "$(grep 'safe_to_delete.txt' "$DEPLOY")" "xargs -d"
 
 case_ "G9" "Рабочая папка не остаётся на диске ни при каком выходе"
+# 🔴 13.09.2026: СВОЙ TMPDIR, а не общий системный. Прежняя редакция считала
+# и в конце СНОСИЛА `$TMPDIR/repo_deploy_*` целиком — вместе с рабочей папкой
+# настоящего деплоя владельца, шедшего параллельно. Тот залил ассет v1.12.11,
+# остался без клона и папки описаний и перезаписал заголовки v1.12.10/v1.12.8
+# голым «self-map vX.Y.Z». Тест трогает только то, что создал сам.
 D="$SANDBOX/tG9"; mkdir -p "$D"
+T9="$SANDBOX/tmpG9"; mkdir -p "$T9"
 make_zip "$D" "tmp-clean-repo" "1.0.0" dot
 BEFORE_DL="$(ls -1 "$HOME/Downloads" 2>/dev/null | grep -c 'repo_deploy' || true)"
-run_deploy "$D" >/dev/null
+( export TMPDIR="$T9"; run_deploy "$D" >/dev/null )
 AFTER_DL="$(ls -1 "$HOME/Downloads" 2>/dev/null | grep -c 'repo_deploy' || true)"
 assert_eq "в Downloads не появилось рабочих папок" "$AFTER_DL" "$BEFORE_DL"
-LEFT="$(ls -d "${TMPDIR:-/tmp}"/repo_deploy_* 2>/dev/null | wc -l | tr -d ' ')"
+LEFT="$(ls -d "$T9"/repo_deploy_* 2>/dev/null | wc -l | tr -d ' ')"
 assert_eq "во временной папке не осталось мусора" "$LEFT" "0"
 # ранний выход (DRY) тоже обязан убирать за собой
-DRY=1 run_deploy "$D" >/dev/null
-LEFT="$(ls -d "${TMPDIR:-/tmp}"/repo_deploy_* 2>/dev/null | wc -l | tr -d ' ')"
+( export TMPDIR="$T9"; DRY=1 run_deploy "$D" >/dev/null )
+LEFT="$(ls -d "$T9"/repo_deploy_* 2>/dev/null | wc -l | tr -d ' ')"
 assert_eq "после DRY тоже чисто" "$LEFT" "0"
 # VERIFY — тоже ранний выход
-VERIFY=1 run_deploy "$D" >/dev/null 2>&1 || true
-LEFT="$(ls -d "${TMPDIR:-/tmp}"/repo_deploy_* 2>/dev/null | wc -l | tr -d ' ')"
+( export TMPDIR="$T9"; VERIFY=1 run_deploy "$D" >/dev/null 2>&1 ) || true
+LEFT="$(ls -d "$T9"/repo_deploy_* 2>/dev/null | wc -l | tr -d ' ')"
 assert_eq "после VERIFY тоже чисто" "$LEFT" "0"
 # KEEP_WORK=1 — осознанная отладка, папка остаётся и названа
-OUT="$(KEEP_WORK=1 run_deploy "$D")"
+OUT="$(export TMPDIR="$T9"; KEEP_WORK=1 run_deploy "$D")"
 assert_contains "с KEEP_WORK=1 путь назван" "$OUT" "рабочая папка оставлена"
-rm -rf "${TMPDIR:-/tmp}"/repo_deploy_* 2>/dev/null || true
+assert_contains "оставленная папка — в своём TMPDIR теста" "$OUT" "$T9/repo_deploy_"
+rm -rf "$T9"
 
 case_ "G10" "DELETE_AFTER удаляет архив только при подтверждённой публикации"
 D="$SANDBOX/tG10"; mkdir -p "$D"

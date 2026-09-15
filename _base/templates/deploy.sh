@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# deploy.sh v4.28.1 — ЕДИНЫЙ деплойер репозиториев. Один скрипт на всю систему.
+# deploy.sh v4.28.4 — ЕДИНЫЙ деплойер репозиториев. Один скрипт на всю систему.
 #
 # 🔴 РОЛЬ СУЖЕНА 09.09.2026 РЕШЕНИЕМ ВЛАДЕЛЬЦА (`ADR-008`, правило одной руки).
 # Обычный выпуск — коммит, тег, push, релиз — делает вахта через
@@ -147,7 +147,7 @@ ASSET="${ASSET:-1}"
 # висеть перед тем, как механизм вообще успеет заметить проблему.
 CLONE_LOW_SPEED_LIMIT="${CLONE_LOW_SPEED_LIMIT:-51200}"  # байт/с — ниже считаем зависанием
 CLONE_LOW_SPEED_TIME="${CLONE_LOW_SPEED_TIME:-15}"        # столько секунд подряд ниже лимита → обрыв
-SCRIPT_VERSION="4.28.1"
+SCRIPT_VERSION="4.28.4"
 # Накопители по релизам. Объявлены здесь, а не в блоке 2Б: ветка REPAIR (шаг 2А)
 # вызывает ensure_release раньше, и под `set -u` обращение к необъявленной ASSET_OK
 # роняло весь прогон уже ПОСЛЕ создания релиза — работа сделана, а код возврата ошибка.
@@ -371,8 +371,14 @@ FATAL_PATTERNS='GH001|exceeds GitHub.s file size limit|pre-receive hook declined
 
 retry(){ d="$1"; shift; a=1; s="$RETRY_SLEEP"
   while [ "$a" -le "$RETRIES" ]; do
-    _out="$("$@" 2>&1)"; _rc=$?
-    printf '%s\n' "$_out"
+    # 🔴 13.09.2026, заказ владельца: «весит на последней линии… не вижу какая
+    # скорость какой прогресс и всё ли ок». Раньше вывод копился в `$(...)` и
+    # печатался ПОСЛЕ завершения — на гигабайтном push это минуты тишины.
+    # Теперь он идёт в терминал живьём (tee), а копия нужна для FATAL_PATTERNS.
+    _rlog="$(mktemp)"
+    { "$@"; echo "$?" >"$_rlog.rc"; } 2>&1 | tee "$_rlog"
+    _rc="$(cat "$_rlog.rc" 2>/dev/null || echo 1)"; _out="$(cat "$_rlog")"
+    rm -f "$_rlog" "$_rlog.rc"
     [ "$_rc" -eq 0 ] && return 0
     if printf '%s' "$_out" | grep -qE "$FATAL_PATTERNS"; then
       red "  ✗ $d — отказ ОКОНЧАТЕЛЬНЫЙ, ретрай не поможет:"
@@ -742,6 +748,99 @@ gh_try_upload(){
   done
 }
 
+# curl_meter — читает сырой метр curl со stdin и рисует ОДНУ строку на месте:
+#   [#####---------------]  23%  227 из 957 МБ · сейчас 512 КБ/с · в среднем 911 КБ/с · прошло 0:04:15 · осталось 0:13:41
+# 🔴 13.09.2026, владелец: «таблица очень плохо». Метр curl — 12 колонок
+# с двухстрочной шапкой на английском; нужная часть — 6 чисел.
+# Читаем по `\r` (`read -d`), а не через `tr`: tr в пайпе буферизует блоками
+# по 4 КБ, и строка обновлялась бы раз в минуту вместо раза в секунду.
+# Разбор — одним awk: `set -- $строка` в zsh НЕ делит на слова (нет
+# SH_WORD_SPLIT), а в bash `$10` читается как `$1` и «0». Оба дефекта
+# пойманы проверкой 13.09.2026 до раскладки.
+curl_meter(){
+  _ml=""; _mshown=0
+  while IFS= read -r -d $'\r' _ml || [ -n "$_ml" ]; do
+    # последний кусок метра кончается на `\n`, а не на `\r`: сначала срезать
+    # хвостовой перевод строки, иначе строка «100%» теряется целиком
+    _ml="${_ml%$'\n'}"; _ml="${_ml##*$'\n'}"
+    _mo="$(printf '%s\n' "$_ml" | awk '
+      function u(x) {
+        if (x ~ /k$/) return substr(x, 1, length(x) - 1) " КБ"
+        if (x ~ /M$/) return substr(x, 1, length(x) - 1) " МБ"
+        if (x ~ /G$/) return substr(x, 1, length(x) - 1) " ГБ"
+        return x " Б"
+      }
+      NF >= 12 && $1 ~ /^[0-9]+$/ {
+        f = int($1 / 5); bar = ""
+        for (i = 0; i < 20; i++) bar = bar (i < f ? "#" : "-")
+        left = $11; if ($1 == 100) left = "готово"; else if (left ~ /-/) left = "считаю"
+        printf "[%s] %3d%%  %s из %s · сейчас %s/с · в среднем %s/с · прошло %s · осталось %s",
+               bar, $1, u($6), u($2), u($12), u($8), $10, left
+      }')"
+    if [ -n "$_mo" ]; then
+      printf '\r    %s%s%s\033[K' "$C_CYN" "$_mo" "$C_OFF" >&2
+      _mshown=1
+    fi
+    _ml=""
+  done
+  [ "$_mshown" -eq 1 ] && printf '\n' >&2
+  return 0
+}
+
+# upload_progress <репа> <тег> <файл> <имя> — заливка ассета curl'ом с ЖИВЫМ
+# прогрессом: процент, сколько залито, средняя и текущая скорость, сколько
+# осталось. 🔴 Заказ владельца 13.09.2026. `gh` процент наружу не отдаёт
+# (см. gh_try_upload выше), curl — отдаёт.
+#
+# Код 2 = путь недоступен (нет curl / токена / id релиза) → вызывающий берёт
+# gh_try_upload. Так же отрабатывает тестовый стаб gh: токена у него нет.
+# `-T`, а не `--data-binary @файл`: второй читает гигабайт в память целиком.
+# Токен идёт заголовком из файла 600, а не аргументом — иначе виден в `ps`.
+upload_progress(){
+  _pr="$1"; _pt="$2"; _pf="$3"; _pn="$4"
+  command -v curl >/dev/null 2>&1 || return 2
+  _tok="$(gh auth token 2>/dev/null)"
+  printf '%s' "$_tok" | grep -qE '^(gh[pousr]_|github_pat_)[A-Za-z0-9_]+$' || return 2
+  _rid="$(gh_try api "repos/$OWNER/$_pr/releases/tags/$_pt" --jq '.id' 2>/dev/null)"
+  case "$_rid" in ''|*[!0-9]*) return 2 ;; esac
+  _penc="$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$_pn")"
+  _phf="$(mktemp)"; chmod 600 "$_phf"
+  printf 'Authorization: Bearer %s\n' "$_tok" >"$_phf"
+  _pa=0
+  while [ "$_pa" -lt 3 ]; do
+    _pa=$((_pa+1))
+    # clobber: недолитый/старый ассет с тем же именем даёт 422 на загрузке
+    _aid="$(gh_try api "repos/$OWNER/$_pr/releases/$_rid/assets" --paginate \
+            --jq ".[] | select(.name==\"$_pn\") | .id" 2>/dev/null | head -1)"
+    case "$_aid" in ''|*[!0-9]*) : ;;
+      *) gh_try api -X DELETE "repos/$OWNER/$_pr/releases/assets/$_aid" >/dev/null 2>&1 ;; esac
+    _presp="$(mktemp)"; _pcf="$(mktemp)"
+    # stdout curl (код HTTP) → файл, stderr (метр) → curl_meter; код выхода
+    # curl — тоже в файл: в пайпе он иначе теряется.
+    { curl -X POST -T "$_pf" -o "$_presp" -w '%{http_code}' \
+        -H @"$_phf" -H "Accept: application/vnd.github+json" \
+        -H "Content-Type: application/zip" \
+        --speed-limit 1024 --speed-time 120 \
+        "https://uploads.github.com/repos/$OWNER/$_pr/releases/$_rid/assets?name=$_penc"
+      echo "$?" >"$_pcf.rc"; } 2>&1 >"$_pcf" | curl_meter
+    _pcode="$(cat "$_pcf" 2>/dev/null)"; _pcrc="$(cat "$_pcf.rc" 2>/dev/null || echo 1)"
+    rm -f "$_pcf" "$_pcf.rc"
+    if [ "$_pcrc" -eq 0 ] && [ "$_pcode" = "201" ]; then
+      rm -f "$_presp" "$_phf"; return 0
+    fi
+    case "$_pcode" in
+      401|403|404)
+        red "    ✗ заливка отклонена (HTTP $_pcode) — ретрай не поможет:"
+        head -c 300 "$_presp" | sed 's/^/      /'; echo
+        rm -f "$_presp" "$_phf"; return 1 ;;
+    esac
+    ylw "    заливка оборвалась (curl=$_pcrc, HTTP ${_pcode:-—}) — попытка $_pa/3, повторяю"
+    ylw "    сейчас безопасно переключить VPN: следующая попытка откроет соединение заново"
+    rm -f "$_presp"; sleep $((_pa * 5))
+  done
+  rm -f "$_phf"; return 1
+}
+
 # Существует ли релиз. Отличает «нет релиза» (rc=1, ответ получен) от
 # «запрос не прошёл» (сеть/таймаут) — во втором случае возвращает 2 и версия
 # не считается отсутствующей. Раньше оба случая выглядели одинаково, и скрипт
@@ -1042,18 +1141,11 @@ ensure_release(){
       fi
     fi
   else
-    if [ "$ASSET" = "1" ] && [ -n "$_z" ]; then
-      cp "$_z" "$WORK/$_aname"
-      _asz="$(du -m "$WORK/$_aname" 2>/dev/null | cut -f1)"
-      ylw "    → заливаю ассет $_aname${_asz:+ (~${_asz} МБ)}"
-      gh_try_upload "$GH_UPLOAD_TIMEOUT" release create "v$_v" "$WORK/$_aname" --repo "$OWNER/$_r" --title "$_t" --notes-file "$_n" $_lat >/dev/null \
-        && { grn "    ✓ релиз v$_v (+ассет $_aname)"; note "$_r|v$_v|релиз|создан"
-             # помечаем ассет подтверждённым: иначе автоудаление архива не сработает
-             # для только что созданных релизов (эта ветка выходит из функции раньше)
-             ASSET_OK="${ASSET_OK:-} $_v"; } \
-        || { red "    ✗ релиз v$_v не создан"; note "$_r|v$_v|релиз|✗ ошибка"; }
-      rm -f "$WORK/$_aname"; return 0
-    fi
+    # 🔴 13.09.2026: релиз создаётся БЕЗ файла, ассет льётся блоком ниже —
+    # там upload_progress показывает процент и скорость, а сверка размера
+    # и ASSET_OK уже на месте. Раньше `release create <файл>` лил гигабайт
+    # молча, с одним счётчиком секунд.
+    ylw "    → создаю релиз v$_v"
     gh_try release create "v$_v" --repo "$OWNER/$_r" --title "$_t" --notes-file "$_n" $_lat >/dev/null 2>&1 \
       && { grn "    ✓ релиз v$_v"; note "$_r|v$_v|релиз|создан"; } \
       || { red "    ✗ релиз v$_v не создан"; note "$_r|v$_v|релиз|✗ ошибка"; }
@@ -1079,7 +1171,14 @@ ensure_release(){
         _lsz="$(wc -c < "$WORK/$_aname" | tr -d ' ')"
         _lmb=$(( (_lsz + 524288) / 1048576 ))
         ylw "    → заливаю ассет $_aname (~${_lmb} МБ, из $_src)"
-        if gh_try_upload "$GH_UPLOAD_TIMEOUT" release upload "v$_v" "$WORK/$_aname" --repo "$OWNER/$_r" --clobber >/dev/null; then
+        _ut0=$(date +%s)
+        upload_progress "$_r" "v$_v" "$WORK/$_aname" "$_aname"; _urc=$?
+        if [ "$_urc" -eq 2 ]; then
+          gh_try_upload "$GH_UPLOAD_TIMEOUT" release upload "v$_v" "$WORK/$_aname" --repo "$OWNER/$_r" --clobber >/dev/null
+          _urc=$?
+        fi
+        [ "$_urc" -eq 0 ] && plain "    залито за $(( $(date +%s) - _ut0 ))с"
+        if [ "$_urc" -eq 0 ]; then
           # Сверяем РАЗМЕР на GitHub с локальным: обрыв связи или нехватка места
           # дают частичный файл, который выглядит как успешная загрузка.
           _rsz="$(gh_try release view "v$_v" --repo "$OWNER/$_r" --json assets \
@@ -1897,6 +1996,10 @@ while IFS= read -r REPO; do
     # а VERSION ещё и одного размера — git по паре size+mtime решает «файл не менялся»
     # и НЕ хэширует содержимое. Итог: дерево новое, индекс пуст, тег висит на старом
     # дереве. Поэтому индекс пересобираем принудительно, а не доверяем stat-кэшу.
+    _cn=$(find . -path ./.git -prune -o \( -type f -o -type l \) -print | wc -l | tr -d ' ')
+    _cm=$(du -sm "$SRC" 2>/dev/null | cut -f1)
+    cyn "  → индексирую и коммичу: $_cn файлов${_cm:+, ~$_cm МБ} (у git add нет прогресса — идёт работа)"
+    _ct0=$(date +%s)
     git rm -r --cached -q . >/dev/null 2>&1 || true
     git add -A -f                                                        # PIT-006
     if git diff --cached --quiet && [ -n "$(git tag -l)" ]; then
@@ -1907,13 +2010,15 @@ while IFS= read -r REPO; do
       CMSG="$(build_notes "$SRC" "$VER" "$REPO" "$NOTES_DIR/v$VER.md" 2>/dev/null)" || CMSG=""
       [ -n "$CMSG" ] || CMSG="$REPO v$VER"
       git commit -q -m "$CMSG" || { red "  commit не удался"; continue; }
-      TREE_N=$(find . -path ./.git -prune -o -type f -print | wc -l | tr -d ' ')
+      # PIT-007: git хранит симлинки как объекты — считать их наравне с файлами.
+      # 13.09.2026: 13 ссылок web/node_modules/.bin дали 9350 ≠ 9337 и стоп self-map.
+      TREE_N=$(find . -path ./.git -prune -o \( -type f -o -type l \) -print | wc -l | tr -d ' ')
       GIT_N=$(git ls-tree -r --name-only HEAD | wc -l | tr -d ' ')
       if [ "$GIT_N" != "$TREE_N" ]; then
         red "  в коммите $GIT_N файлов, в дереве $TREE_N (PIT-006/007) — стоп по этой репе"
         note "$REPO|v$VER|коммит|✗ расхождение файлов"; break
       fi
-      grn "  ✓ коммит: $GIT_N файлов"
+      grn "  ✓ коммит: $GIT_N файлов за $(( $(date +%s) - _ct0 ))с"
     fi
     git tag -a "v$VER" -m "$TITLE" || { red "  tag не удался"; continue; }
     PUBLISHED="$PUBLISHED $VER"
@@ -1933,13 +2038,15 @@ while IFS= read -r REPO; do
       note "$REPO|$VER|push|ОТКАЗ: файлы >100МБ"
       continue
     fi
-    echo ""; ylw "→ пушу ветку и теги"
+    _gsz="$(du -sm .git 2>/dev/null | cut -f1)"
+    echo ""; ylw "→ пушу ветку и теги${_gsz:+ (.git ~${_gsz} МБ)} — ниже живой прогресс git: объекты, МиБ, скорость"
+    _pt0=$(date +%s)
     pushb(){ git -c "http.lowSpeedLimit=$CLONE_LOW_SPEED_LIMIT" \
-      -c "http.lowSpeedTime=$CLONE_LOW_SPEED_TIME" push -u origin "$BRANCH"; }
+      -c "http.lowSpeedTime=$CLONE_LOW_SPEED_TIME" push --progress -u origin "$BRANCH"; }
     pusht(){ git -c "http.lowSpeedLimit=$CLONE_LOW_SPEED_LIMIT" \
-      -c "http.lowSpeedTime=$CLONE_LOW_SPEED_TIME" push origin --tags; }
+      -c "http.lowSpeedTime=$CLONE_LOW_SPEED_TIME" push --progress origin --tags; }
     if retry "git push branch" pushb && retry "git push tags" pusht; then
-      grn "✓ запушено"
+      grn "✓ запушено за $(( $(date +%s) - _pt0 ))с"
     else
       red "✗ push не удался (проверь токен/сеть) — репа пропущена, локальная работа в $WORK"
       note "$REPO|—|push|✗ не удался"; continue

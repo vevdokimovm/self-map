@@ -76,6 +76,9 @@ STANDARD.md` §2) — **семь шагов**, и за одну сессию 28.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import hashlib
+import json
 import subprocess
 import re
 import sys
@@ -84,7 +87,7 @@ from pathlib import Path
 # Корень определяется общим модулем: скрипт может быть запущен и из базы,
 # и из копии кита в репе-наследнике (`_base/scripts/`). См. `_roots.py`.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _roots import resolve_roots  # noqa: E402
+from _roots import artifacts_dir, resolve_roots  # noqa: E402
 BASE_REPO, REPOS, FROM_KIT = resolve_roots(__file__)
 
 
@@ -263,6 +266,118 @@ def verify_postconditions(repo: Path, new_version: str) -> list[str]:
 PASSPORT_RE = re.compile(r"\b\d{1,3}\s*/\s*100\b")
 
 
+
+def роадмап_актуален(repo: Path, body: str) -> tuple[bool, str]:
+    """Батч закрыт — роадмап либо изменился, либо объяснён строкой.
+
+    🔴 ЗАКАЗ ВЛАДЕЛЬЦА 13.09.2026, дословно: «Сделай уже сраный гейт что
+    сделал задачу — обновил роадмап привел его в актуальное состояние».
+    Слово «уже» значит, что просьба звучала не впервые.
+
+    **Как проверяется.** Отпечаток `ROADMAP.md` сравнивается с тем, что был
+    на прошлом батче (`reports/.roadmap-state.json`). Если файл не менялся,
+    батч всё равно закрывается — но **только** когда в теле `CHANGELOG`
+    есть слово «роадмап»: вахта обязана сказать вслух, почему план остался
+    прежним. Это та же механика, что у журнала кампании (`00-CLAUDE-STOP`
+    §Пятое), и она уже доказала работоспособность: пустой день и забытый
+    день выглядят одинаково, если про пустой не написать.
+
+    🔴 ЧЕГО НЕ ЛОВИТ: правку роадмапа «для вида». Совпадение отпечатка —
+    механическая величина, осмысленность записи ей не видна. Гейт умеет
+    verification, не validation (`69` §4г).
+    """
+    файл = repo / "ROADMAP.md"
+    if not файл.is_file():
+        return True, "роадмапа нет — проверять нечего"
+    отпечаток = hashlib.sha256(файл.read_bytes()).hexdigest()
+    состояние = repo / "reports" / ".roadmap-state.json"
+    прежний = ""
+    if состояние.is_file():
+        try:
+            прежний = json.loads(состояние.read_text(encoding="utf-8")).get("sha256", "")
+        except (ValueError, OSError):
+            прежний = ""
+    состояние.parent.mkdir(parents=True, exist_ok=True)
+    состояние.write_text(json.dumps({"sha256": отпечаток}, ensure_ascii=False),
+                         encoding="utf-8")
+    if отпечаток != прежний:
+        return True, "роадмап изменён этим батчем"
+    if "роадмап" in body.lower():
+        return True, "роадмап не менялся — сказано в теле батча"
+    return False, ("роадмап НЕ менялся и в теле батча о нём ни слова.\n"
+                   "   Либо закрой/добавь пункт в ROADMAP.md, либо напиши строкой,\n"
+                   "   почему план остался прежним — молчание неотличимо от того,\n"
+                   "   что про него забыли.")
+
+
+STATE_BEGIN = "<!-- СОСТОЯНИЕ:НАЧАЛО -->"
+STATE_END = "<!-- СОСТОЯНИЕ:КОНЕЦ -->"
+
+
+def состояние_на_закрытие(repo: Path, version: str, title: str, body: str,
+                          note: str | None) -> str:
+    """Шаг 7: снимок «где стоим» в WATCHLOG — чтобы `/clear` был безопасен.
+
+    🔴 ЗАКАЗ ВЛАДЕЛЬЦА 15.09.2026: «Мб сделать так чтобы можно было в любой
+    момент clear чат?» Ответ: git хранит историю ФАЙЛОВ, а `/clear` стирает
+    историю РАЗГОВОРА — где остановились, что открыто, что не проверено.
+    Этого нет ни в одном файле, пока шаг не запишет.
+
+    Факты снимаются с диска, а не с памяти вахты: незакоммиченное,
+    неотправленное, выпущена ли версия. Незакрытые вопросы берутся из тела
+    батча (строки про «открыто», «не проверено») или из `--state-note`.
+    """
+    def g(*args: str) -> str:
+        rc, out = run(["git", "-C", str(repo), *args])
+        return out.strip() if rc == 0 else ""
+
+    грязных = len([l for l in g("status", "--porcelain").splitlines() if l.strip()])
+    впереди = g("rev-list", "--count", "origin/main..HEAD") or "?"
+    тег = "есть" if g("tag", "-l", f"v{version}") else "🔴 нет"
+    архив = (Path(artifacts_dir()) / f"{repo.name}-v{version}.zip").exists()
+    открытые = [l.strip(" -*") for l in (body or "").splitlines()
+                if re.search(r"открыт|не проверен|не замерен|осталось", l, re.I)]
+    if note:
+        открытые.insert(0, note)
+    когда = dt.datetime.now().strftime("%d.%m.%Y %H:%M")
+    блок = [STATE_BEGIN,
+            f"### 🧭 Состояние на закрытие батча — {repo.name} v{version}, {когда}",
+            "",
+            "> Снимок ставит `close_batch.py` шагом 7. Пока он свежий и строки ниже",
+            "> зелёные, **чат можно чистить (`/clear`) без `/handoff`**: всё нужное в файлах.",
+            "",
+            f"- **последнее сделано:** {title}",
+            f"- **незакоммичено файлов:** {грязных}"
+            + ("" if грязных == 0 else " 🔴 — это НЕ в git, при `/clear` потеряется контекст правки"),
+            f"- **коммитов не отправлено:** {впереди}",
+            f"- **тег v{version}:** {тег} · **архив в каталоге артефактов:** "
+            + ("есть — версия не выпущена, выпустить `github_sync.py --archive`" if архив else "нет (выпущена или удалён после сверки)"),
+            ]
+    if открытые:
+        блок.append("- **открыто на момент закрытия:**")
+        блок += [f"  - {x}" for x in открытые[:8]]
+    else:
+        блок.append("- **открытых вопросов не названо** — если это неверно, "
+                    "передай `--state-note`")
+    блок += ["", STATE_END]
+    текст = "\n".join(блок)
+    ж = repo / "WATCHLOG.md"
+    if not ж.is_file():
+        return "нет WATCHLOG.md"
+    было = ж.read_text(encoding="utf-8")
+    if STATE_BEGIN in было and STATE_END in было:
+        до, остаток = было.split(STATE_BEGIN, 1)
+        _, после = остаток.split(STATE_END, 1)
+        стало = до + текст + после
+    else:
+        строки = было.split("\n")
+        i = next((k for k, l in enumerate(строки) if l.startswith("## §0")), 0)
+        конец = i + 1
+        стало = "\n".join(строки[:конец] + ["", текст] + строки[конец:])
+    ж.write_text(стало, encoding="utf-8")
+    return f"WATCHLOG §0: незакоммичено {грязных}, не отправлено {впереди}, открытых {len(открытые)}"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("repo")
@@ -279,6 +394,7 @@ def main() -> int:
     g.add_argument("--major", action="store_true")
     g.add_argument("--minor", action="store_true")
     g.add_argument("--patch", action="store_true")
+    ap.add_argument("--state-note", help="что осталось открытым — в снимок состояния (шаг 7)")
     ap.add_argument("--state", action="store_true",
                     help="показать состояние батча (VERSION · архив · журнал) и выйти")
     ap.add_argument("--dry-run", action="store_true",
@@ -339,7 +455,7 @@ def main() -> int:
 
     bump_flag = "--major" if a.major else "--minor" if a.minor else "--patch"
     # У базы шагов шесть: добавляется раздача канона наследникам.
-    total = 6 if (REPOS / a.repo) == BASE_REPO else 5
+    total = 7 if (REPOS / a.repo) == BASE_REPO else 6
 
     if a.state:
         print_state(repo)
@@ -402,6 +518,13 @@ def main() -> int:
             if line.strip().startswith("·"):
                 print("    " + line.strip())
 
+    # --- 2а. роадмап: закрыл задачу — приведи план в актуальное состояние ----
+    ок, почему = роадмап_актуален(repo, body)
+    print(f"  роадмап: {почему.splitlines()[0]}")
+    if not ок:
+        print(f"\n🔴 ОСТАНОВЛЕНО: {почему}")
+        return 1
+
     # --- 3. версия и живые документы -----------------------------------------
     step(3, total, "версия · CHANGELOG · WATCHLOG · README")
     rc, out = run(["python3", str(BASE_REPO / "scripts/bump_repo.py"), a.repo,
@@ -459,6 +582,10 @@ def main() -> int:
             # Не фатально: канон в базе уже верен, разошлись только копии.
             print(f"  ⚠️  раздача не прошла (код {rc}) — копии отстали, "
                   f"почини: python3 scripts/sync_base_local.py --all")
+
+    # --- 7. состояние на закрытие: чтобы `/clear` был безопасен ---------------
+    step(total, total, "состояние на закрытие (можно ли чистить чат)")
+    print("  " + состояние_на_закрытие(repo, new_version, a.title, body, a.state_note))
 
     # 🔴 ПОСТУСЛОВИЯ. «Ритуал не упал» и «результат на месте» — разные
     # утверждения, и до 29.08.2026 проверялось только первое.

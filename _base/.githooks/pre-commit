@@ -62,7 +62,14 @@ SECRET_PATTERNS = [
 ]
 # Плейсхолдеры и чтение из окружения — не секреты.
 SAFE_VALUE = re.compile(
-    r"(getenv|environ|process\.env|os\.|\{\{|\$\{|<|xxx|your_|example|placeholder|\.\.\.|change_?me)",
+    # 🔴 `change[_-]?me` С ДЕФИСОМ — найдено 13.09.2026 на живом файле.
+    # `finpilot/app/config.py` объявляет подставной ключ
+    # `dev-insecure-secret-change-me-in-production-env-32b`, и сканер поднял
+    # тревогу: шаблон знал `change_me` и `changeme`, но не `change-me`.
+    # Ложное срабатывание на безопасном значении учит обходить проверку —
+    # это дороже, чем чуть более широкий список исключений (`PIT-207`).
+    r"(getenv|environ|process\.env|os\.|\{\{|\$\{|<|xxx|your_|example|"
+    r"placeholder|\.\.\.|change[_-]?me|dev[_-]insecure)",
     re.I,
 )
 
@@ -103,6 +110,20 @@ def check_weight(path: Path) -> str | None:
     except OSError:
         return None
     suffix = path.suffix.lower()
+
+    # 🔴 ИСКЛЮЧЕНИЕ ДЛЯ ВЫДАЧИ ПРЕЗЕНТАЦИОННОГО КИТА — узкое, по каталогу.
+    # Найдено 13.09.2026 опытом на копии `quick-answers`: коммит в репе-наследнице
+    # остановлен хуком на `_base/11-presentation-kit/output/ONBOARDING.docx` и `.rtf`.
+    # Два правила противоречили друг другу: кит ОБЯЗАН выдавать эти форматы
+    # (для этого он и существует — отдать документ людям вне репы), а хук их
+    # ЗАПРЕЩАЕТ. В самой базе файлы проходили только потому, что давно
+    # не менялись: первая же пересборка кита заблокировала бы и её.
+    #
+    # Исключён ТОЛЬКО запрет форматов и только в `16-document-kit/output/`
+    # (до 14.09.2026 каталог жил в `11-presentation-kit/output/`).
+    # Лимиты веса и проверка секретов действуют и здесь.
+    if "16-document-kit/output/" in path.as_posix() and suffix in BANNED_SUFFIXES:
+        return None
 
     if suffix in BANNED_SUFFIXES:
         return f"{path} — формат {suffix} в репе не место (распаковать / законспектировать)"

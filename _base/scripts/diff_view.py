@@ -6,7 +6,12 @@
 **локального файла**: содержимое базы приватно, и уносить его на сторонние
 серверы ради удобства просмотра — плохой размен.
 
-🔴 ПОЧЕМУ СТРАНИЦА, А НЕ ВЫВОД В ТЕРМИНАЛ. Замер 05.09.2026: iTerm
+🔴 15.09.2026 ВЛАДЕЛЕЦ ПЕРЕРЕШИЛ: «так нахера ты html делаешь… если ты можешь
+это делать прямо здесь в окне айтерма». Умолчание теперь `--term` — сводка
+и правка печатаются в окно, где владелец их и читает. Страница осталась
+для больших правок, чтобы не заливать окно сотнями строк.
+
+🔴 ПОЧЕМУ СТРАНИЦА БЫЛА УМОЛЧАНИЕМ. Замер 05.09.2026: iTerm
 и WindowServer вместе брали до **80 % ядра** на отрисовке вывода вахты
 поверх игры (`LOAD-CLASSES.md` §4д). Длинный цветной диф в терминале —
 это кадры владельца. Файл открывается тогда, когда он сам захочет.
@@ -15,8 +20,10 @@
 Только читает `git diff` и пишет один HTML в каталог артефактов.
 
 Применение:
-    diff_view.py                 диф рабочей копии против HEAD
+    diff_view.py                 сводка в окно (умолчание с 15.09.2026)
+    diff_view.py --html          страницей в каталог артефактов
     diff_view.py --open          и сразу открыть в браузере
+    diff_view.py --range v4.207.1..v4.208.0   что изменилось между двумя версиями
     diff_view.py --selftest      канарейка
 """
 
@@ -152,7 +159,10 @@ def selftest() -> bool:
 def main() -> int:
     р = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    р.add_argument("--html", action="store_true", help="страницей вместо окна")
+    р.add_argument("--limit", type=int, default=120, help="строк правки в окно")
     р.add_argument("--open", action="store_true", help="открыть в браузере")
+    р.add_argument("--range", help="A..B — две версии (теги) или коммита, 15.09.2026")
     р.add_argument("--selftest", action="store_true")
     a = р.parse_args()
 
@@ -166,14 +176,34 @@ def main() -> int:
         print("🔴 в этой репе нет .git — сравнивать не с чем")
         return 2
 
-    версия = Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").is_file() else "?"
-    диф = _git("diff", "HEAD")
-    новые = [с[3:] for с in _git("status", "--short").splitlines() if с.startswith("??")]
+    if a.range:
+        версия = a.range
+        диф = _git("diff", a.range)
+        новые = []
+        стат = _git("diff", "--stat", a.range)
+        имя = a.range.replace("..", "_to_").replace("/", "-")
+    else:
+        версия = Path("VERSION").read_text(encoding="utf-8").strip() if Path("VERSION").is_file() else "?"
+        диф = _git("diff", "HEAD")
+        новые = [с[3:] for с in _git("status", "--short").splitlines() if с.startswith("??")]
+        стат = _git("diff", "--stat", "HEAD")
+        имя = версия
     файлы = разобрать(диф)
 
-    куда = Path(artifacts_dir()) / f"diff-{версия}.html"
-    куда.write_text(собрать(версия, файлы, новые, _git("diff", "--stat", "HEAD")),
-                    encoding="utf-8")
+    if not a.html:
+        print(стат.strip() or "различий нет")
+        строки = диф.splitlines()
+        if строки:
+            print(f"\n--- правка ({min(len(строки), a.limit)} из {len(строки)} строк) ---")
+            print("\n".join(строки[:a.limit]))
+            if len(строки) > a.limit:
+                print(f"… ещё {len(строки) - a.limit} строк: --limit N или --html")
+        for н in новые:
+            print(f"?? {н}")
+        return 0
+
+    куда = Path(artifacts_dir()) / f"diff-{имя}.html"
+    куда.write_text(собрать(версия, файлы, новые, стат), encoding="utf-8")
     print(f"🟢 {куда}")
     print(f"   файлов изменено: {len(файлы)} · новых путей: {len(новые)}")
     if a.open:

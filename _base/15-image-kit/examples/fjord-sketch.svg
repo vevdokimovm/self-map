@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e9d6e3"/><stop offset="1" stop-color="#f6e7ec"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <path d="M0 420 L220 300 L420 380 L640 260 L900 390 L1100 330 L1350 250 L1600 360 L1600 470 L0 470 Z" fill="#9aa3b5"/>
+  <rect y="470" width="1600" height="200" fill="#5d6b7d"/>
+  <path d="M0 640 Q700 600 1600 560 L1600 900 L0 900 Z" fill="#f4f1f4"/>
+  <rect x="470" y="560" width="400" height="60" fill="#8a8f96"/>
+  <rect x="540" y="400" width="300" height="160" fill="#a8322c"/>
+  <polygon points="520,405 690,300 860,405" fill="#ffffff" stroke="#c9c9c9" stroke-width="3"/>
+  <rect x="600" y="450" width="50" height="60" fill="#ffffff"/>
+  <g font-family="Helvetica, Arial, sans-serif" font-size="26" fill="#333">
+    <text x="30" y="50">НАБРОСОК КОМПОЗИЦИИ — не результат</text>
+    <text x="900" y="300">горы в тумане, розовый рассвет</text>
+    <text x="1000" y="540">вода фьорда, пар над водой</text>
+    <text x="890" y="470">дом: левая треть кадра, на уровне глаз</text>
+    <text x="1000" y="800">снег на переднем плане</text>
+  </g>
+  <line x1="533" y1="0" x2="533" y2="900" stroke="#555" stroke-dasharray="8 8"/>
+  <line x1="1066" y1="0" x2="1066" y2="900" stroke="#555" stroke-dasharray="8 8"/>
+</svg>

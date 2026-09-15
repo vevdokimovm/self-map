@@ -46,13 +46,20 @@ def извлечь_парсер() -> str:
     return текст[начало:конец]
 
 
-def собрать(версия: str, репа: str, куда: Path) -> str:
-    """Пишет тело релиза в файл, возвращает готовый заголовок."""
+def собрать(версия: str, репа: str, куда: Path, журнал: Path | None = None) -> str:
+    """Пишет тело релиза в файл, возвращает готовый заголовок.
+
+    🔴 `журнал` — CHANGELOG ВЫПУСКАЕМОЙ репы. Первая редакция брала
+    `CHANGELOG.md` базы всегда: для `base-repo` верно, для любой другой
+    репы описание собралось бы из чужого журнала — или не собралось вовсе.
+    Найдено чтением кода 13.09.2026, до первого выпуска чужой репы.
+    """
+    журнал = журнал or (БАЗА / "CHANGELOG.md")
     with tempfile.TemporaryDirectory() as tmp:
         парсер = Path(tmp) / "chlog.py"
         парсер.write_text(извлечь_парсер(), encoding="utf-8")
         res = subprocess.run(
-            [sys.executable, str(парсер), str(БАЗА / "CHANGELOG.md"), версия, str(куда)],
+            [sys.executable, str(парсер), str(журнал), версия, str(куда)],
             capture_output=True, text=True, encoding="utf-8")
     if res.returncode != 0:
         raise SystemExit(f"🔴 в CHANGELOG нет секции [{версия}] — "
@@ -86,6 +93,7 @@ def main() -> int:
     р.add_argument("версия", nargs="?")
     р.add_argument("--repo", default="base-repo")
     р.add_argument("--out", type=Path)
+    р.add_argument("--changelog", type=Path, help="CHANGELOG выпускаемой репы")
     р.add_argument("--selftest", action="store_true")
     a = р.parse_args()
 
@@ -98,7 +106,7 @@ def main() -> int:
     if not a.версия:
         р.error("нужна версия")
     куда = a.out or Path(tempfile.gettempdir()) / f"notes-{a.версия}.md"
-    заголовок = собрать(a.версия, a.repo, куда)
+    заголовок = собрать(a.версия, a.repo, куда, a.changelog)
     print(заголовок)
     print(f"тело: {куда}", file=sys.stderr)
     return 0

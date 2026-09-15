@@ -9,7 +9,9 @@
 
 ---
 
-> 🆕 **Форматы файлов** — [`FORMATS.md`](FORMATS.md): PDF, DOCX, EPUB, XLSX, RTF, HTML и чем каждый собирается. Исполнитель — `scripts/make_document.py`.
+> 🆕 **Вход одной командой — скилл [`/presentation`](../.claude/skills/presentation/SKILL.md)** (14.09.2026): только слайды. 🔴 **Изображения, схемы, гифки вынесены 14.09.2026 в [`15-image-kit`](../15-image-kit/README.md)**.
+
+> 🆕 **Документы (PDF, DOCX, EPUB, XLSX, RTF, HTML) вынесены 14.09.2026 в [`16-document-kit`](../16-document-kit/README.md)**, скилл `/document`. Прежняя строка: форматы файлов — `FORMATS.md`, исполнитель — `scripts/make_document.py`.
 
 ## §1. Инструменты уже подключены — не писать HTML руками
 
@@ -92,7 +94,7 @@ gs -sDEVICE=pdfwrite -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH \
 
 ## §4а. Диаграммы и визуал — отдельным документом
 
-[`DIAGRAMS.md`](DIAGRAMS.md) — заказ владельца 04.09.2026: *«кит по созданию
+[`15-image-kit/DIAGRAMS.md`](../15-image-kit/DIAGRAMS.md) (вынесен в кит изображений 14.09.2026) — заказ владельца 04.09.2026: *«кит по созданию
 изображений с нуля… диаграммы разные, любой визуал по промпту»*.
 
 🔴 **Главное оттуда, ради чего документ и заведён.** Владелец сформулировал
