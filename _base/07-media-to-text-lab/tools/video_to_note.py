@@ -137,6 +137,26 @@ class VideoNote:
         return result
 
 
+def log_timing(video: Path, dur: float, model: str, wall: float, segments: int) -> None:
+    """Замер распознавания — в реестр `asr-timings.csv` сразу, без участия вахты.
+
+    Реестр заведён 15.09.2026 и пополнялся руками; замер, который надо не забыть
+    записать, записывают через раз. Сбой записи прогон не роняет: заметка
+    ценнее строки в реестре.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from asr_timing_log import TimingRegistry
+        row = TimingRegistry.measure(
+            source=video.name, duration=dur, model=model, threads=4, wall=wall,
+            tool="tools/video_to_note.py", note=f"сегментов {segments}")
+        TimingRegistry().append([row])
+        print(f"   замер → asr-timings.csv: {row['ratio']}× длительности, "
+              f"loadavg {row['loadavg']}, параллельных whisper {row['parallel_asr']}")
+    except Exception as exc:  # noqa: BLE001 — реестр не должен ронять распознавание
+        print(f"   🟡 замер не записан: {exc}")
+
+
 def render(video: Path, dur: float, model: str, segs, frames, secs: float) -> str:
     words = sum(len(s[2].split()) for s in segs)
     lines = [
@@ -220,8 +240,11 @@ def main() -> int:
     if dur <= 0:
         sys.exit(f"🔴 ffprobe не прочитал длительность: {a.video}")
     print(f"── {a.video.name}: {fmt(dur)}", flush=True)
+    asr_start = time.time()
     segs = vn.transcribe(vn.model_path(a.download))
-    print(f"   речь: {len(segs)} сегментов за {time.time() - start:.0f} с", flush=True)
+    asr_wall = time.time() - asr_start
+    print(f"   речь: {len(segs)} сегментов за {asr_wall:.0f} с", flush=True)
+    log_timing(a.video, dur, a.model, asr_wall, len(segs))
     frames = []
     if not a.no_frames:
         fdir = a.frames_dir or a.out.with_suffix(".frames")

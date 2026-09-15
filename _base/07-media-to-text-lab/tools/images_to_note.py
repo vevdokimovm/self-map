@@ -14,7 +14,7 @@
 
   1. **Паспорт** рядом с файлом: размеры, вес, тип, где лежит, чем открыть.
   2. **Сжатие** через `sips` (системная утилита macOS) — до порога, с сохранением
-     пропорций. Оригинал уходит в `~/Documents/_heavy-originals/`, **не удаляется**.
+     пропорций. Оригинал уходит в `~/raw-originals/` (СТ-001.1), **не удаляется**.
   3. Ничего не делает с тем, что **уже** укладывается в порог.
 
 🔴 ГРАНИЦА, НАЗВАННАЯ ВСЛУХ (`71` §7г-бис). Скрипт **не описывает, что на картинке**.
@@ -50,7 +50,7 @@ from pathlib import Path
 
 BASE_REPO = Path(__file__).resolve().parent.parent.parent
 REPOS = BASE_REPO.parent
-VAULT = Path.home() / "Documents" / "_heavy-originals"
+VAULT = Path.home() / "raw-originals"  # СТ-001.1: вне iCloud; до 15.09.2026 было ~/Documents/_heavy-originals
 SKIP_PARTS = {"_base", ".git", "node_modules", ".venv", "__pycache__"}
 IMG = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".heic"}
 

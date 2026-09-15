@@ -96,6 +96,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import hashlib
 import shutil
@@ -150,6 +151,32 @@ def _distribute() -> tuple[str, ...]:
 DISTRIBUTE = _distribute()
 
 
+def _files_under(src: Path) -> set[Path]:
+    """Файлы каталога ОТНОСИТЕЛЬНО него, проходя сквозь симлинки-каталоги.
+
+    🔴 `Path.rglob` в каталог-симлинк не заходит, а `copytree` (symlinks=False)
+    его разыменовывает и кладёт в зеркало реальные файлы. Из-за расхождения
+    план объявлял «🔴 ИСЧЕЗНЕТ безвозвратно 27» на КАЖДОЙ из 54 реп — это
+    `.claude/plugin/agents/*` и `.claude/plugin/skills/*`, симлинки на
+    `.claude/agents` и `.claude/skills`. Файлы никуда не исчезали: следующая
+    же раздача клала их обратно.
+
+    Третий случай ложной тревоги в этой функции (после `__pycache__` и
+    `BASE_VERSION`), и потому чинится в корне: `os.walk(followlinks=True)`
+    вместо `rglob`. Ложная тревога, повторённая 54 раза, обучает не читать план —
+    а план здесь последняя защита перед безвозвратным сносом.
+    """
+    found: set[Path] = set()
+    for dirpath, dirnames, filenames in os.walk(src, followlinks=True):
+        dirnames[:] = [d for d in dirnames if d not in JUNK_DIRS]
+        rel_dir = Path(dirpath).relative_to(src)
+        for name in filenames:
+            if name in JUNK_NAMES:
+                continue
+            found.add(rel_dir / name if rel_dir != Path(".") else Path(name))
+    return found
+
+
 def _copytree_clean(src: Path, dst: Path) -> None:
     def ignore(dirpath: str, names: list[str]) -> set[str]:
         return {n for n in names if n in JUNK_DIRS or n in JUNK_NAMES}
@@ -201,10 +228,7 @@ def plan_one(repo: Path, base_dir: Path) -> str:
             # (`_copytree_clean`). Иначе план вечно показывал «новых 30» —
             # это были `__pycache__/*.pyc`, которые не приедут никогда,
             # и они же попадали в «ИСЧЕЗНЕТ безвозвратно» (ревью 29.08.2026).
-            incoming |= {Path(name) / p.relative_to(src)
-                         for p in src.rglob("*") if p.is_file()
-                         and not any(x in JUNK_DIRS or x in JUNK_NAMES
-                                     for x in p.relative_to(src).parts)}
+            incoming |= {Path(name) / rel for rel in _files_under(src)}
         elif src.is_file():
             incoming.add(Path(name))
     # 🔴 Два файла создаёт САМА раздача уже после копирования — штамп версии

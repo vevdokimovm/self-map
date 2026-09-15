@@ -80,6 +80,29 @@ def _сканер():
     return модуль.scan_secrets
 
 
+def распаковать(архив: Path, куда: Path) -> int:
+    """Распаковать zip С ПРАВАМИ ФАЙЛОВ. Возвращает число файлов с восстановленным +x.
+
+    🔴 `zipfile.extractall` права НЕ восстанавливает: режим лежит в
+    `external_attr`, упаковщик его пишет (в архиве есть 755), а распаковка молча
+    выдаёт всем 644. Дерево шло в `git add` — и каждый деплой коммитил скрипты
+    неисполняемыми. Это и был «периодически слетающий +x» во всех репах:
+    найдено 15.09.2026, когда `video_to_note.py` не запустился.
+    """
+    восстановлено = 0
+    with zipfile.ZipFile(архив) as z:
+        z.extractall(куда)
+        for info in z.infolist():
+            режим = (info.external_attr >> 16) & 0o777
+            if info.is_dir() or not режим:
+                continue
+            путь = куда / info.filename
+            if путь.is_file() and not путь.is_symlink():
+                путь.chmod(режим)
+                восстановлено += bool(режим & 0o111)
+    return восстановлено
+
+
 def тег_есть(корень: Path, версия: str) -> bool:
     код, вывод = git(корень, "ls-remote", "--tags", "origin", f"refs/tags/v{версия}")
     return код == 0 and bool(вывод.strip())
@@ -210,8 +233,7 @@ def подготовить_архив(архив: Path, сухо: bool) -> dict 
 
     врем = Path(tempfile.mkdtemp(prefix=f"deploy-{репа}-"))
     try:
-        with zipfile.ZipFile(архив) as z:
-            z.extractall(врем)
+        распаковать(архив, врем)
         верх = [p for p in врем.iterdir() if p.name != "__MACOSX"]
         дерево = верх[0] if len(верх) == 1 and верх[0].is_dir() else врем
         индекс = врем / "_index"
@@ -345,7 +367,25 @@ def selftest() -> bool:
         f.write_text(f"api_key = '{ключ}'\ntoken = os.getenv('X')\n")
         g = Path(td) / "b.md"
         g.write_text("просто текст про password и token\n")
-        return len(скан(f)) >= 1 and скан(g) == []
+        сканер_ок = len(скан(f)) >= 1 and скан(g) == []
+
+        # Права переживают упаковку и распаковку: 755 остаётся 755, 644 — 644.
+        исх = Path(td) / "src"
+        исх.mkdir()
+        (исх / "run.py").write_text("#!/usr/bin/env python3\n")
+        (исх / "run.py").chmod(0o755)
+        (исх / "note.md").write_text("x\n")
+        (исх / "note.md").chmod(0o644)
+        арх = Path(td) / "a.zip"
+        with zipfile.ZipFile(арх, "w") as z:
+            for имя in ("run.py", "note.md"):
+                z.write(исх / имя, имя)
+        вых = Path(td) / "out"
+        вых.mkdir()
+        n = распаковать(арх, вых)
+        права_ок = (n == 1 and (вых / "run.py").stat().st_mode & 0o777 == 0o755
+                    and (вых / "note.md").stat().st_mode & 0o777 == 0o644)
+        return сканер_ок and права_ок
 
 
 def main() -> int:

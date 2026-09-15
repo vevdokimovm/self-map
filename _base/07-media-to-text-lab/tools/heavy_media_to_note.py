@@ -17,7 +17,7 @@
   2. Снимает с них паспорт: размер, sha256, тип, длительность (если есть `ffprobe`),
      дата, откуда пришёл.
   3. Пишет `<имя>.md` **на место файла** — со всем, что нужно, чтобы понять и найти.
-  4. Переносит оригинал в `~/Documents/_heavy-originals/<репа>/<путь>` — вне git,
+  4. Переносит оригинал в `~/raw-originals/<репа>/<путь>` (СТ-001.2) — вне git,
      но на диске.
 
 ГРАНИЦА (`71` §7г-бис): содержимое видео и сканов скрипт **не читает**. Он делает
@@ -42,7 +42,7 @@ from pathlib import Path
 
 BASE_REPO = Path(__file__).resolve().parent.parent.parent
 REPOS = BASE_REPO.parent
-VAULT = Path.home() / "Documents" / "_heavy-originals"
+VAULT = Path.home() / "raw-originals"  # СТ-001.1: вне iCloud; до 15.09.2026 было ~/Documents/_heavy-originals
 SKIP_PARTS = {"_base", ".git", "node_modules", ".venv", "__pycache__"}
 
 
@@ -98,6 +98,9 @@ def note_text(p: Path, repo: Path, mb: float, digest: str, dest: Path) -> str:
 | длительность | {dur} |
 | sha256 | `{digest}` |
 | оригинал сейчас | `{dest}` |
+| выжимка | `🔴 не извлечена` |
+| источник | `не указан — заполнить вахте (СТ-001 §5)` |
+| воспроизводим | `не указано — пока «нет», оригинал не удаляется (СТ-001.7)` |
 
 ## Что внутри
 
