@@ -3127,6 +3127,46 @@ def check_raw_originals(root: Path) -> tuple[list[str], list[str]]:
     return провалы, предупреждения
 
 
+def check_delivery(root: Path) -> tuple[list[str], list[str]]:
+    """Дошло ли до реп то, что система им отправляет (СТ-003.12).
+
+    🔴 ЗАЧЕМ В ГЕЙТЕ. 14.09.2026 завели патчноуты под заказ «все узнают сразу
+    при входе». Файл не попал в раздачу — 0 из 58 реп получили его за сутки,
+    и заметить было нечем: хук отрабатывал с кодом 0 и молчал, потому что
+    читать было нечего (`PIT-G` случай 21). Пустой вход неотличим от «новостей
+    нет», поэтому проверять «механизм отработал» бесполезно — проверяется
+    ДОСТАВЛЕННОСТЬ на стороне получателя.
+
+    🔴 ЧЕГО НЕ ЛОВИТ (слепое пятно). Не проверяет, что вахта прочла и применила
+    доставленное: машиной это не измеряется. Не смотрит содержимое правил —
+    это `check_links` и `check_living_documents`. Непрочитанный патчноут
+    нормой и остаётся: репа могла ещё не открываться.
+    """
+    инструмент = root / "scripts" / "delivery_check.py"
+    if not инструмент.is_file():
+        return [], []
+    res = subprocess.run([sys.executable, str(инструмент)],
+                         capture_output=True, text=True, encoding="utf-8")
+    провалы: list[str] = []
+    предупреждения: list[str] = []
+    текущая = ""
+    for line in res.stdout.splitlines():
+        if not line:
+            continue
+        if not line[0].isspace():
+            текущая = line.strip()
+            continue
+        s = line.strip()
+        метка = f"{текущая}: " if текущая else ""
+        if s.startswith("🔴"):
+            провалы.append(метка + s[1:].strip())
+        elif s.startswith("🟡"):
+            предупреждения.append(метка + s[1:].strip())
+    if res.returncode not in (0, 1) and not провалы:
+        провалы.append(f"delivery_check.py упал: {res.stderr.strip()[-200:]}")
+    return провалы, предупреждения
+
+
 def check_tools_linked(root: Path) -> list[str]:
     """Каждый инструмент в `<кит>/bin/` упомянут в README своего кита.
 
@@ -3924,6 +3964,19 @@ def main() -> int:
             print(f"    · {line}")
     else:
         print("[OK] Оригиналы служебок на месте (СТ-001)")
+
+    недоставлено, отстают = check_delivery(root)
+    if недоставлено:
+        failures.extend(недоставлено)
+        print(f"[FAIL] Каналы связи с репами не доставляют (PIT-G 21): {len(недоставлено)}")
+        for line in недоставлено[:5]:
+            print(f"    · {line}")
+    else:
+        print("[OK] Доставка в репы: правила, новости, вход на месте")
+    if отстают:
+        print(f"[WARN] Репы отстают от канона: {len(отстают)}")
+        for line in отстают[:5]:
+            print(f"    · {line}")
     if в_облаке:
         print(f"[WARN] Оригиналы в синкаемой iCloud-папке (СТ-001.3): {len(в_облаке)}")
         for line in в_облаке[:5]:
