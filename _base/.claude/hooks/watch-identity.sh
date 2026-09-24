@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 # watch-identity.sh — определить, под какой вахтой идёт сессия, и сказать это вслух.
 #
-# Версия: 1.0.0 (2026-08-28)
+# Версия: 1.1.0 (2026-09-16)
+#
+# 1.1.0 — жалоба владельца 16.09.2026: «у тебя опять не работает гейт на чек какая вахта
+# сейчас». Хук стоял только в base-repo и искал реестр относительно CLAUDE_PROJECT_DIR:
+# в personal-finance-dss его не было вовсе, и вахта записала буквы по догадке. Плюс он
+# висел только на SessionStart, а /login меняет аккаунт посреди сессии. Добавлено:
+# запасной путь к реестру в базе (`$HOME/repos/base-repo/...`), переопределения
+# WATCH_MAP_FILE / WATCH_STATE_DIR (тесты) и флаг `--on-change` для UserPromptSubmit —
+# молчит, пока почта та же, и говорит в первый же ход после смены.
 #
 # ЗАЧЕМ ХУК, А НЕ ПРАВИЛО В ТЕКСТЕ.
 # Требование владельца 28.08.2026: «внеси правило чекать вахту автоматически
@@ -39,11 +47,15 @@ set -Eeuo pipefail
 # живёт в `84-claude-accounts.md`. Хук искал почту там, где её нет, и молча
 # не находил — при этом ветка `case` знала ровно две вахты из пяти, поэтому
 # отказ был не виден: две работали, три «не опознавались».
-MAP_FILE="${CLAUDE_PROJECT_DIR:-$PWD}/00-infrastructure/84-claude-accounts.md"
+ON_CHANGE=0
+[ "${1:-}" = "--on-change" ] && ON_CHANGE=1
+MAP_FILE="${WATCH_MAP_FILE:-${CLAUDE_PROJECT_DIR:-$PWD}/00-infrastructure/84-claude-accounts.md}"
+# Хук вызывается и из других реп: реестр тогда берётся из базы по абсолютному пути.
+MAP_BASE="$HOME/repos/base-repo/00-infrastructure/84-claude-accounts.md"
 # Запасной адрес — сводка планировщика: если базы рядом нет (хук раздаётся
 # в 54 репы), почта может найтись там.
 MAP_FALLBACK="${CLAUDE_PROJECT_DIR:-$PWD}/../mission-control/ACCOUNTS.md"
-STATE_DIR="${TMPDIR:-/tmp}/claude-watch-identity"
+STATE_DIR="${WATCH_STATE_DIR:-${TMPDIR:-/tmp}/claude-watch-identity}"
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 STATE_FILE="$STATE_DIR/last-email"
 
@@ -77,11 +89,14 @@ fi
 # в гейте: перечень покрывает ровно замеченное, правило — все случаи.
 # Ищем строку таблицы, где встречается эта почта, и берём из неё букву.
 letter=""
-for f in "$MAP_FILE" "$MAP_FALLBACK"; do
+for f in "$MAP_FILE" "$MAP_BASE" "$MAP_FALLBACK"; do
   [ -f "$f" ] || continue
   [ -n "$letter" ] && break
-  letter="$(grep -F "$email" "$f" 2>/dev/null \
-            | grep -oE '\*\*[VJMSA]\*\*' | head -1 | tr -d '*')"
+  # `|| true` обязателен: при `set -e` неопознанная почта роняла хук с кодом 1,
+  # и вместо крика «вахта НЕ ОПОЗНАНА» он молчал — ровно тот отказ, ради которого
+  # хук и написан. Поймано тестом `test_unknown_email_is_not_guessed` 16.09.2026.
+  letter="$( { grep -F "$email" "$f" 2>/dev/null \
+            | grep -oE '\*\*[VJMSA]\*\*' | head -1 | tr -d '*'; } || true )"
 done
 
 prev=""
@@ -96,6 +111,10 @@ fi
 
 if [ -n "$prev" ] && [ "$prev" != "$email" ]; then
   msg="$msg 🔴 ЛИЧНОСТЬ СМЕНИЛАСЬ (было: ${prev}) — записи в WATCHLOG под прежней буквой перепроверить."
+fi
+
+if [ "$ON_CHANGE" = 1 ] && [ "$prev" = "$email" ]; then
+  exit 0
 fi
 
 echo "$msg"

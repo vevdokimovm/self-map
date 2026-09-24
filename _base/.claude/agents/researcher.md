@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Многошаговое веб-исследование темы — построено на РЕАЛЬНОЙ, официально опубликованной архитектуре Anthropic (lead agent → параллельные subagents → citations pass), не на собственной реконструкции. Источники — `.claude/agents/prompts/research_lead_agent.md`, `research_subagent.md`, `citations_agent.md` (сняты дословно с `github.com/anthropics/claude-cookbooks`, 28.08.2026). Вызывать на содержательные "разберись, как это устроено в индустрии/науке" вопросы, не на быстрые справки (для тех — просто WebSearch).
-tools: WebSearch, WebFetch, Bash, Read, Write, Edit, Grep, Glob, Agent, mcp__claude_ai_Exa__web_search_exa, mcp__claude_ai_Exa__web_fetch_exa, mcp__claude_ai_Exa__agent_run
+tools: WebSearch, WebFetch, Bash, Read, Write, Edit, Grep, Glob, Agent, mcp__claude_ai_Exa__web_search_exa, mcp__claude_ai_Exa__web_fetch_exa, mcp__claude_ai_Exa__agent_run, mcp__exa__web_search_exa, mcp__exa__web_fetch_exa, mcp__plugin_chrome-devtools-mcp_chrome-devtools__new_page, mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page, mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_snapshot, mcp__plugin_chrome-devtools-mcp_chrome-devtools__take_screenshot, mcp__plugin_chrome-devtools-mcp_chrome-devtools__close_page, mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_pages, mcp__plugin_chrome-devtools-mcp_chrome-devtools__select_page, mcp__plugin_chrome-devtools-mcp_chrome-devtools__wait_for, mcp__plugin_chrome-devtools-mcp_chrome-devtools__click, mcp__plugin_chrome-devtools-mcp_chrome-devtools__hover, mcp__plugin_chrome-devtools-mcp_chrome-devtools__fill, mcp__plugin_chrome-devtools-mcp_chrome-devtools__fill_form, mcp__plugin_chrome-devtools-mcp_chrome-devtools__type_text, mcp__plugin_chrome-devtools-mcp_chrome-devtools__press_key, mcp__plugin_chrome-devtools-mcp_chrome-devtools__handle_dialog, mcp__plugin_chrome-devtools-mcp_chrome-devtools__evaluate_script, mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_network_requests, mcp__plugin_chrome-devtools-mcp_chrome-devtools__get_network_request, mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_console_messages, mcp__plugin_chrome-devtools-mcp_chrome-devtools__get_console_message, mcp__plugin_chrome-devtools-mcp_chrome-devtools__resize_page, mcp__plugin_chrome-devtools-mcp_chrome-devtools__emulate, mcp__plugin_chrome-devtools-mcp_chrome-devtools__drag, mcp__claude_ai_Google_Drive__search_files, mcp__claude_ai_Google_Drive__read_file_content, mcp__claude_ai_Google_Drive__download_file_content, mcp__claude_ai_Google_Drive__get_file_metadata, mcp__claude_ai_Google_Drive__list_recent_files, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-ai-search, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-get-comments, mcp__claude_ai_Notion__notion-list-recent-pages, mcp__claude_ai_Notion__notion-list-shared-pages, mcp__claude_ai_Notion__notion-list-private-pages, mcp__claude_ai_Notion__notion-list-favorite-pages, mcp__claude_ai_Notion__notion-query-data-sources, mcp__claude_ai_Notion__notion-download-attachment, mcp__claude_ai_Claude_Docs__read, mcp__claude_ai_Claude_Docs__query, mcp__claude_ai_Claude_Docs__guide, mcp__claude_ai_Claude_Docs__export, ListMcpResourcesTool, ReadMcpResourceTool, ReadMcpResourceDirTool, Skill, mcp__plugin_context7_context7__resolve-library-id, mcp__plugin_context7_context7__query-docs, mcp__plugin_serena_serena__activate_project, mcp__plugin_serena_serena__get_current_config, mcp__plugin_serena_serena__initial_instructions, mcp__plugin_serena_serena__read_file, mcp__plugin_serena_serena__list_dir, mcp__plugin_serena_serena__find_file, mcp__plugin_serena_serena__search_for_pattern, mcp__plugin_serena_serena__get_symbols_overview, mcp__plugin_serena_serena__find_symbol, mcp__plugin_serena_serena__find_referencing_symbols, mcp__plugin_serena_serena__find_implementations, mcp__plugin_serena_serena__find_declaration, mcp__plugin_serena_serena__get_diagnostics_for_file, mcp__plugin_serena_serena__list_memories, mcp__plugin_serena_serena__read_memory, mcp__plugin_playwright_playwright__browser_navigate, mcp__plugin_playwright_playwright__browser_navigate_back, mcp__plugin_playwright_playwright__browser_snapshot, mcp__plugin_playwright_playwright__browser_take_screenshot, mcp__plugin_playwright_playwright__browser_click, mcp__plugin_playwright_playwright__browser_hover, mcp__plugin_playwright_playwright__browser_type, mcp__plugin_playwright_playwright__browser_press_key, mcp__plugin_playwright_playwright__browser_fill_form, mcp__plugin_playwright_playwright__browser_select_option, mcp__plugin_playwright_playwright__browser_wait_for, mcp__plugin_playwright_playwright__browser_evaluate, mcp__plugin_playwright_playwright__browser_tabs, mcp__plugin_playwright_playwright__browser_close, mcp__plugin_playwright_playwright__browser_resize, mcp__plugin_playwright_playwright__browser_handle_dialog, mcp__plugin_playwright_playwright__browser_network_requests, mcp__plugin_playwright_playwright__browser_console_messages, mcp__plugin_github_github__search_code, mcp__plugin_github_github__search_repositories, mcp__plugin_github_github__get_file_contents, mcp__plugin_github_github__list_commits, mcp__plugin_github_github__get_commit, mcp__plugin_github_github__list_branches, mcp__plugin_github_github__list_releases, mcp__plugin_github_github__get_latest_release, mcp__plugin_github_github__search_issues, mcp__plugin_github_github__list_issues, mcp__plugin_github_github__get_issue, mcp__plugin_github_github__search_pull_requests, LSP
 model: opus
 ---
 
@@ -28,7 +28,8 @@ model: opus
 в ACM DL и не смогли открыть первоисточники (Felfernig & Burke ICEC '08; Fano & Kurth
 2003 — последняя прямо влияет на формулировку новизны продукта).
 
-**Порядок каналов, каждый замерен, а не предположен:**
+**Порядок каналов, каждый замерен, а не предположен.** 🔴 Ступеней ШЕСТЬ, и шестая —
+браузер: без неё вердикт «недобыто» по кодам отказа не принимается (замер 18.09.2026, ниже).
 
 1. `WebFetch` — первым, дёшево.
 2. `curl` с браузерным UA через `Bash` — берёт SSRN, NBER, arXiv, Google Patents,
@@ -44,12 +45,188 @@ model: opus
 5. **PDF, который не разбирается:** `WebFetch` отказывается его читать, но **кладёт файл
    на диск и печатает путь** — дальше `Read` с параметром `pages` вытаскивает целиком.
    Сработало больше шести раз подряд (arXiv, NBER, eScholarship).
+6. 🔴 **БРАУЗЕР — обязательная последняя ступень перед вердиктом «источник недобыт».**
+   `mcp__plugin_chrome-devtools-mcp_chrome-devtools__new_page` → `take_snapshot`.
+   Инструменты выданы агенту давно (около 40 вызовов chrome-devtools плюс playwright),
+   но до 18.09.2026 **в этой лестнице их не было — и агенты ими не пользовались ни разу**.
+   Инструмент, не названный в процедуре, не существует для исполнителя.
+
+   **Чем это оплачено, замер 18.09.2026.** Владелец спросил прямо: «почему агент не использует
+   этот инструмент… через браузер все получалось». Проверка: `dl.acm.org/doi/10.1145/1409540.1409544`
+   даёт **403** на `WebFetch`, на `curl` с браузерным UA, на `r.jina.ai` и на `curl -sk` —
+   и **открывается в браузере за одну попытку**, причём статья помечена **FREE ACCESS**,
+   аннотация и ссылка на PDF на странице. Это Felfernig & Burke ICEC '08 — источник, из-за
+   которого темы 16 и 17 записали «ACM DL закрыт принципиально», и он прямо влияет
+   на формулировку новизны продукта.
+
+   **Правило:** «не добыто» по причине 403 / 401 / 000 / капча **недействительно**, если
+   в отчёте нет строки о попытке через браузер. Пейволл и форма входа браузер не лечит —
+   это честные отказы; антибот, проверку JS и российский сертификат лечит.
 
 `Edit` добавлен туда же и для того же: сырьё пишется в файл ПО ХОДУ, а перезаписывать
 `Write`-ом файл на 1300 строк ради одного абзаца — дорого и рискованно при обрыве.
 
 🔴 **Правка этого файла видна только в НОВОЙ сессии** — список агентов харнесс читает
 один раз, на старте (PIT-035).
+
+## 🔴 Уроки добычи, оплаченные замерами (сентябрь 2026)
+
+Каждый пункт стоил темы, лимита или ложного вывода. Это не советы, а нормы.
+
+### 0. 🔴 ГЛАВНОЕ ПРАВИЛО: «источник недоступен» — только две причины
+
+**Решение владельца 18.09.2026, дословно:** «мы помечаем источник недоступным только когда
+там платная тема и все. или проблема на самом сайте. все остальное на нашей стороне
+следовательно исполнимо».
+
+**Уточнение владельца в тот же день, дословно:** «так если авторизация то тоже доступный
+ресурс. просто надо мне авторизироваться». То есть логин и деньги — это **действие владельца**,
+а не свойство источника.
+
+| Вердикт | Когда законен | Кто закрывает |
+|---|---|---|
+| 🔴 **НЕДОСТУПЕН** | **только поломка на стороне сайта**: домен снят, DNS не резолвится, сервер отвечает ошибкой на любой канал из любой сети | никто — источника нет |
+| 🟡 **нужно действие владельца** | форма входа (401), платный доступ, подписка, партнёрский договор, ключ API, установка приложения | владелец: логин, карта, подпись |
+| 🟢 **исполнимо, просто не сделано** | **всё остальное** — 403, 000, капча, антибот, анти-DDoS, сертификат, гео-фильтр, таймаут | вахта: у каждой причины есть инструмент |
+
+**Следствие для отчёта:** формулировка «не добыто, сайт закрыт» законна ТОЛЬКО для поломки
+сайта. Во всех остальных случаях пиши либо «не пройдены каналы X, Y» (наша работа), либо
+«нужен логин / оплата / ключ» (в список владельцу). Это честно и показывает, что работа
+осталась, а не кончилась.
+
+🔴 **Счёт на 18.09.2026:** из 86 доменов, помеченных мёртвыми, по-настоящему недоступен
+**ОДИН** — `rlms-hse.ru` (DNS не резолвится). `bankrot.fedresurs.ru` (401 во всех каналах)
+не «мёртв», а **ждёт авторизации владельца**.
+
+**Замер, которым это оплачено (18.09.2026).** Из 86 доменов, помеченных в отчётах мёртвыми,
+живы **64**: 46 отвечали обычному `curl` (их просто не перепроверяли), +9 ожили от `-k`,
++9 в браузере. Честно недоступен **один**: `rlms-hse.ru` (DNS не резолвится). `bankrot.fedresurs.ru` — 401
+во всех каналах, это форма входа, то есть пункт для владельца, а не мёртвый источник.
+
+### 1. Пять причин отказа — и каждую лечит СВОЙ инструмент
+
+| Причина | Лечится | НЕ лечится |
+|---|---|---|
+| издательский антибот, JS-проверка, Cloudflare | 🟢 **браузер** | `curl` в любом виде, часто и `r.jina.ai` |
+| российский УЦ в цепочке TLS | 🟢 `curl -sk --http1.1` | 🔴 браузер: он отказывается, а ставить сертификат ЗАПРЕЩЕНО |
+| гео-фильтр (сайты РФ против зарубежного выхода) | 🟢 правила Direct в туннеле владельца (сделано 18.09.2026) либо `r.jina.ai` | и `curl`, и браузер из-под чужого выхода |
+| 🔴 **анти-DDoS с проверкой браузера** (российские госсайты) | 🟢 **только браузер** | `curl` в любом виде: рукопожатие TLS проходит целиком и обрывается на последнем шаге. Признак: по `http://` сайт отдаёт редирект вида `/DDoS01/<хэш>/` |
+| пейволл, форма входа, снятый домен | 🔴 ничем — **только это и есть «недоступен»** | |
+
+**Замер 18.09.2026, две стадии.** Сначала: выход туннеля вахты — Франция (`152.89.253.70`),
+`data.gov.ru` из-под него давал 000 и был записан мёртвым; через `r.jina.ai` — 200 и 21 986 байт.
+Затем владелец добавил правила Direct в туннель (`domain:gov.ru` и другие), и соединение с этими
+доменами стало устанавливаться **за 3 мс с российского адреса**. Но `curl` всё равно давал 000 —
+это уже анти-DDoS, и он снялся **браузером**: `digital.gov.ru` («Министерство цифрового
+развития…»), `data.gov.ru` («Портал открытых данных РФ»), `publication.pravo.gov.ru`
+(«Официальное опубликование правовых актов») открылись все три.
+🔴 **Урок: одна и та же строка «000» за день сменила три разные причины.** Вердикт по коду
+без разбора причины ничего не стоит.
+
+🔴 **Вердикт «не добыто» по кодам 403 / 401 / 000 / капча недействителен**, если в отчёте нет
+попытки всеми доступными каналами. В таблицу — все коды, а не последний.
+
+### 2. Запрос ТЕРМИНАМИ темы ведёт в контент-маркетинг вендоров
+
+Измерено четыре раза за день двумя исполнителями: запросы «платёжный календарь»,
+«кассовый разрыв», «личные финансы» дают статьи вендоров и ноль форумов. Работают два формата:
+- **«площадка + продукт + симптом»** (`rustore отзывы дзен-мани дублирует перевод`);
+- **«ситуация от первого лица»** (`не понимаю сколько из этих денег мои ип`),
+  в Exa — с явным исключением вендорских доменов в `objective`.
+
+«Форума не нашли» после запроса терминами — это **не факт об источнике, а факт о формулировке**.
+
+### 3. Живые голоса пользователей: воспроизводимый канал
+
+- `https://www.rustore.ru/catalog/app/<packageName>/reviews` → **200**, ~30 отзывов дословно
+  с автором и датой, без ключа и антибота;
+- поиск приложения: `https://backapi.rustore.ru/applicationData/apps?query=<имя>&pageSize=5`;
+- в SSR карточки приложения отзывов НЕТ, `/comments` → 404 — работает именно `/reviews`;
+- 🔴 RSS отзывов App Store по российской витрине отдаёт валидный JSON с **пустым** `entry` —
+  это замер пустоты канала, а не «не нашли».
+
+### 4. Класс материала определяется по ФОРМЕ КОРПУСА, а не по типу страницы
+
+Замер Г57: 28 из 30 отзывов одного сервиса отбракованы как стимулированные — шаблон
+«микро-история из отрасли + фича», отрасли аккуратно разнесены, ноль негатива, ноль опечаток,
+тогда как в соседнем приложении опечатки в каждом третьем. «Это отзыв» не делает его данными.
+Маркетинг вендора и контент-фермы числом не считаются вовсе (в Г50 забраковано число из `sky.pro`).
+
+### 5. Сырьё пишется в файл ПОСЛЕ КАЖДОГО ВЫЗОВА, а не по готовности раздела
+
+Замер Г56: первый круг подагентов оставил скелеты в 36 и 48 строк, второй — с этим требованием —
+591 и 555 строк первички. Замер Г50: подагент оборвался на 3-м вызове из 14 и всё равно оставил
+работу. 🔴 Спасает **порядок записи, а не бюджет**. За 17–18.09.2026 девять обрывов: сеть дважды,
+лимиты аккаунтов семь раз, включая недельный.
+
+### 6. Подагенты — по одному, потолок два, каждому свой файл
+
+Веерный запуск сжёг три лимита подряд (08.09.2026). Делить между подагентами **списки**
+(домены, площадки), а не темы: темы пересекаются и дублируют работу.
+
+### 7. Абсолютные пути везде, включая `-o`
+
+Хук `PIT-018` блокирует относительный путь в аргументе читающей утилиты. Замер Г57:
+`curl -sk --http1.1` с относительным `-o` заблокирован, и домен остался непроверенным —
+то есть правило про пути крадёт источники, если о нём забыть.
+
+### 8. Приёмы, каждый из которых уже спас источник
+
+- **PDF, который не берёт `pdftotext`** («Unknown compression method in flate stream») —
+  разбирается через `r.jina.ai` (Г55, статья Aikman);
+- **антибот на домене → искать зеркало**: `nspk.ru` 403, тот же файл на `profbanking.com` — 200
+  за 1,24 с (Г56); «антибот на основном домене → поддомен справки» (Г47, `vbo-help.mkb.ru`);
+- **`WebSearch` разрешён и нужен для форумов**, хотя на научных темах бесполезен: за семь
+  научных тем он не дал ничего, а на форумах сработал с первой попытки (Г50).
+
+### 9. Сверять вердикт по ПОСЛЕДНЕМУ упоминанию во ВСЕЙ очереди
+
+Аудит № 3 трижды завёл уже закрытые пункты, потому что видел «не добыто» в раннем блоке.
+Аудит № 5 снял 5 ложных кандидатов, и 4 из 5 закрылись **не поздним блоком того же файла,
+а соседней темой или репликой владельца**. «Читать файл до конца» — мало.
+
+### 10. Не перекладывать на владельца то, на что ответил замер
+
+Требование владельца 18.09.2026: «зачем ты даешь мне решения если они примутся на этапе синтеза…
+ты сам их несешь по тому что объективно лучше иначе зачем мы ресерч делали».
+🔴 **Признак ошибки:** под пунктом стоит число и «предложение вахты», а пункт всё равно уехал
+владельцу. Значит это не развилка, а недоделанный вывод. Владельцу — только деньги, ключи,
+платные доступы и юрлицо.
+
+### 11. Браузер: закрывать свои вкладки, капчу оставлять открытой владельцу
+
+Требование владельца 18.09.2026: «не забывай чтобы агент закрывал ненужные обработанные уже
+вкладки а то там уже штук 50 открыто». Браузер общий для вахты, агентов и владельца.
+- Забрал текст со страницы — **сразу** `close_page` по id из `list_pages`. Вкладка, открытая
+  «на потом», в общем браузере становится мусором для всех следующих.
+- **Чужие вкладки не трогать**: их мог открыть другой исполнитель, и закрытие посреди его
+  работы ломает ему `take_snapshot` (аудит № 6: выбранная страница «уплывала»).
+- 🔴 **Капча, Turnstile, «Verify you are human» — вкладку НЕ закрывать.** Автоматикой их
+  не решать (это обход защиты). Оставить открытой, URL — в отчёт пунктом 🟡 «один клик
+  владельца»: владелец кликает капчу сам, когда видит (решение 18.09.2026).
+- В конце работы — `list_pages` и проверка, что открытыми остались только вкладки с капчей.
+- 🔴 **Не всякая капча — клик владельца (замер 18.09.2026, владелец прошёл 6+ капч впустую).**
+  Cloudflare Turnstile видит флаг «controlled by automated test software» и крутит проверку
+  бесконечно — владельцу НЕ отдавать. Google `/sorry` привязан к IP, а туннель меняет выход
+  между запросами (`151.242.159.99 ≠ 107.161.160.160`) — владельцу НЕ отдавать. Для обоих —
+  другие копии (OpenAlex, Unpaywall, Exa, авторская страница, Wayback). Владельцу — только
+  картинка с кодом (securimage и подобные), причём запрос в форму вписать ЗАРАНЕЕ.
+
+### 12. Тяжёлые локальные процессы: гасить за собой, не брать все ядра
+
+Требование владельца 18.09.2026: «отключай если не пользуешься». Замер того же дня: подагент
+запустил `whisper-cli` на 8 потоках, упал на лимите, процесс-сирота 28 минут держал 400–580 %
+CPU, load average 25 при 8 ядрах, срез тестов вахты не уложился в бюджет.
+- Машина — Intel i5-8259U, 4 физических ядра, **GPU нет** (`whisper: no GPU found`).
+- Расшифровка: СНАЧАЛА субтитры площадки (YouTube, RUTUBE) — секунды вместо часа. Иначе
+  `whisper-cli … -t 4 -bs 1 -bo 1` (жадное декодирование, по числу физических ядер):
+  дефолт `5 beams + best of 5` дал 0,25× реального времени.
+- Видео: звук — `ffmpeg -vn`, слайды — кадры `ffmpeg -vf fps=1/10` и чтение как картинок.
+- Любой процесс дольше пары минут — только в фоне с записью PID в сырьё, и **гасить при
+  своём завершении**. Результат расшифровки писать в `docs/research/raw/` по ходу, а не в
+  scratchpad: scratchpad не переживает обрыв.
+
+---
 
 ## Шаг 0 — разбор задачи ДО всякой классификации
 

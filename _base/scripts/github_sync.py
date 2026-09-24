@@ -103,6 +103,46 @@ def распаковать(архив: Path, куда: Path) -> int:
     return восстановлено
 
 
+def _исключения_упаковщика() -> set[str]:
+    """Каталоги, которые `pack_release.py` НЕ кладёт в архив (единый источник правды)."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from pack_release import JUNK_DIRS
+        return set(JUNK_DIRS)
+    except Exception:  # noqa: BLE001 — список исключений не должен ронять деплой
+        return {"telegram-photos", "telegram-media", "photo-archive", "heavy-originals"}
+
+
+def сохранить_исключённое(корень: Path, env: dict, дерево: Path) -> None:
+    """Не удалять из git то, чего в архиве нет ПО ПРАВИЛУ упаковщика.
+
+    🔴 НАЙДЕНО 25.09.2026. Деплой из архива строит коммит по дереву архива:
+    чего в архиве нет — то удаляется. А `pack_release.py` намеренно исключает
+    тяжёлые хранилища (`telegram-photos`, `telegram-media`, `photo-archive`,
+    `heavy-originals`): они раздувают архив на порядок, а у GitHub жёсткий
+    лимит 100 MiB на файл.
+
+    Пересечение этих двух правил — молчаливое массовое удаление. Сухой прогон
+    публикации `self-map v1.13.0` показал **«удалено 5970»**, из них 3297 —
+    телеграм-фото, которые никто не удалял: их просто нет в архиве по правилу.
+    На момент находки заряжено во всех репах: `it-base` 2611, `christ-walk`
+    2893, `legal-knowledge-base` 1126 файлов в тех же каталогах.
+
+    🔴 РЕАЛЬНОЕ удаление этих файлов деплой из архива больше не переносит —
+    и это верно: их удаляет вахта в рабочей копии, а рабочая копия уезжает
+    режимом `--sync`, где дерево берётся с диска, а не из архива.
+
+    Делается сбросом ИНДЕКСА на HEAD по этим путям, без выкладки файлов
+    на диск: иначе во временное дерево материализовались бы гигабайты.
+    """
+    имена = _исключения_упаковщика()
+    спеки = [f":(glob)**/{имя}/**" for имя in sorted(имена)]
+    спеки += [f":(glob){имя}/**" for имя in sorted(имена)]
+    код, вывод = git(корень, "reset", "-q", "HEAD", "--", *спеки, env=env, cwd=дерево)
+    if код != 0 and "did not match" not in вывод:
+        say(f"   🟡 исключённые упаковщиком каталоги не сохранены: {вывод[-160:]}")
+
+
 def тег_есть(корень: Path, версия: str) -> bool:
     код, вывод = git(корень, "ls-remote", "--tags", "origin", f"refs/tags/v{версия}")
     return код == 0 and bool(вывод.strip())
@@ -241,6 +281,7 @@ def подготовить_архив(архив: Path, сухо: bool) -> dict 
                    GIT_WORK_TREE=str(дерево), GIT_INDEX_FILE=str(индекс))
         git(корень, "read-tree", "HEAD", env=env, cwd=дерево)
         код, вывод = git(корень, "add", "-A", env=env, cwd=дерево)
+        сохранить_исключённое(корень, env, дерево)
         if код != 0:
             say(f"   🔴 add: {вывод[-200:]}")
             return None
@@ -369,6 +410,32 @@ def selftest() -> bool:
         g.write_text("просто текст про password и token\n")
         сканер_ок = len(скан(f)) >= 1 and скан(g) == []
 
+        # 🔴 КАНАРЕЙКА ЛОВУШКИ 25.09.2026: деплой из архива не имеет права
+        # удалять то, чего в архиве нет ПО ПРАВИЛУ упаковщика. Заводится
+        # репа, где такой файл в git есть, а в «архиве» его нет.
+        репа = Path(td) / "repo"
+        (репа / "reports" / "imports" / "telegram-photos").mkdir(parents=True)
+        (репа / "README.md").write_text("старое\n", encoding="utf-8")
+        (репа / "reports/imports/telegram-photos/p.jpg").write_bytes(b"jpeg")
+        for cmd in (["init", "-q", "-b", "main"], ["add", "-A"]):
+            subprocess.run(["git", *cmd], cwd=репа, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                        "commit", "-q", "-m", "первый"], cwd=репа, capture_output=True)
+        дерево = Path(td) / "tree"          # «дерево архива»: фото нет по правилу
+        дерево.mkdir()
+        (дерево / "README.md").write_text("новое\n", encoding="utf-8")
+        индекс = Path(td) / "idx"
+        env = dict(os.environ, GIT_DIR=str(репа / ".git"), GIT_WORK_TREE=str(дерево),
+                   GIT_INDEX_FILE=str(индекс))
+        git(репа, "read-tree", "HEAD", env=env, cwd=дерево)
+        git(репа, "add", "-A", env=env, cwd=дерево)
+        _, до = git(репа, "diff", "--cached", "--name-status", env=env, cwd=дерево)
+        сохранить_исключённое(репа, env, дерево)
+        _, после = git(репа, "diff", "--cached", "--name-status", env=env, cwd=дерево)
+        ловушка_ок = ("D\treports/imports/telegram-photos/p.jpg" in до
+                      and "telegram-photos" not in после
+                      and "M\tREADME.md" in после)
+
         # Права переживают упаковку и распаковку: 755 остаётся 755, 644 — 644.
         исх = Path(td) / "src"
         исх.mkdir()
@@ -385,7 +452,7 @@ def selftest() -> bool:
         n = распаковать(арх, вых)
         права_ок = (n == 1 and (вых / "run.py").stat().st_mode & 0o777 == 0o755
                     and (вых / "note.md").stat().st_mode & 0o777 == 0o644)
-        return сканер_ок and права_ок
+        return сканер_ок and права_ок and ловушка_ок
 
 
 def main() -> int:
@@ -398,7 +465,8 @@ def main() -> int:
     a = р.parse_args()
     if a.selftest:
         ок = selftest()
-        say("🟢 канарейка: сканер секретов из хука работает" if ок else "🔴 КАНАРЕЙКА УПАЛА")
+        say("🟢 канарейка: секреты ловятся, права переживают упаковку, исключённое "
+            "упаковщиком не удаляется деплоем из архива" if ок else "🔴 КАНАРЕЙКА УПАЛА")
         return 0 if ок else 1
     плохо = []
     по_репам: dict[str, list[dict]] = {}
